@@ -8,19 +8,35 @@
 
 #import "PiecewiseAffineWarp.h"
 
+
+typedef struct {
+    GLfloat position[4];
+    GLfloat transformation[8];
+} Vertex;
+
+
+
 @implementation PiecewiseAffineWarp
 
 @synthesize originalImage;
 @synthesize warpedImage;
 
+//const vertex_t vertices2[] = {
+//    { 1,  1, 0, 0},
+//    {-1,  1, 0, 0},
+//    {-1, -1, 0, 0},
+//    {-1, -1, 0, 1},
+//    { 1, -1, 0, 1},
+//    { 1,  1, 0, 1}
+//};
 
-const vertex_t vertices2[] = {
-    { 1,  1, 0, 0},
-    {-1,  1, 0, 0},
-    {-1, -1, 0, 0},
-    {-1, -1, 0, 1},
-    { 1, -1, 0, 1},
-    { 1,  1, 0, 1}
+const Vertex vertices3[] = {
+    {{ 1,  1, 0, 1}, {0, 0, 1, 0, 5, 6, 0}},
+    {{-1,  1, 0, 1}, {0, 1, 0, 0, 5, 6, 0}},
+    {{-1, -1, 0, 1}, {1, 0, 0, 0, 5, 6, 0}},
+    {{-1, -1, 0, 1}, {1, 1, 0, 0, 5, 6, 0}},
+    {{ 1, -1, 0, 1}, {0, 1, 1, 0, 5, 6, 0}},
+    {{ 1,  1, 0, 1}, {1, 0, 1, 0, 5, 6, 0}}
 };
 
 /**
@@ -42,7 +58,7 @@ const vertex_t vertices2[] = {
         
         [self initOES];
         [self initShaders];
-        [self setupVAO:vertices2 :6];
+        [self setupVAO:vertices3 :6];
         
         NSLog(@"VertexShader: %@, FragmentShader: %@", fileVShader, fileFShader);
     }
@@ -80,8 +96,12 @@ const vertex_t vertices2[] = {
 /**
  Create vertex buffer array object
  */
-- (void)setupVAO:(const vertex_t*)v :(int)nv
+- (void)setupVAO:(const Vertex*)v :(int)nv
 {
+    NSLog(@"SETUP VERTEX ARRAY OBJECT");
+    
+    [self checkOpenGLError:@"SetupVAO - at the begin"];
+    
     // create and bind vertex array object
     glGenVertexArraysOES(1, &vao);
     glBindVertexArrayOES(vao);
@@ -90,20 +110,66 @@ const vertex_t vertices2[] = {
     GLuint vertexBuffer;
     glGenBuffers(1, &vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, nv*sizeof(vertex_t), v, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, nv*sizeof(Vertex), v, GL_STATIC_DRAW);
+    
+    
+    [self checkOpenGLError:@"SetupVAO - 1"];
     
     GLuint vPosition = glGetAttribLocation(program, "aPosition");
     glEnableVertexAttribArray(vPosition);
-    glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, sizeof(vertex_t), 0);
+    glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
+    
+    
+    [self checkOpenGLError:@"SetupVAO - 2"];
+    
+    GLuint vTransformation = glGetAttribLocation(program, "aTransformation");
+    [self checkOpenGLError:@"SetupVAO - 3"];
+    glEnableVertexAttribArray(vTransformation);
+    [self checkOpenGLError:@"SetupVAO - 4"];
+    glVertexAttribPointer(shaderLocation[TRANSFORMATION]+0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(sizeof(float)*4));
+    glVertexAttribPointer(shaderLocation[TRANSFORMATION]+1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(sizeof(float)*8));
+    [self checkOpenGLError:@"SetupVAO - 5"];
+    
     
     
     // Bind back to the default state.
     glBindBuffer(GL_ARRAY_BUFFER,0);
     glBindVertexArrayOES(0);
     
+    
+    [self checkOpenGLError:@"SetupVAO"];
+    
     numVertices = nv;
     dataAvailable = YES;
 }
+
+///**
+// Create vertex buffer array object
+// */
+//- (void)setupVAO:(const vertex_t*)v :(int)nv
+//{
+//    // create and bind vertex array object
+//    glGenVertexArraysOES(1, &vao);
+//    glBindVertexArrayOES(vao);
+//    
+//    // create vertex buffer objects
+//    GLuint vertexBuffer;
+//    glGenBuffers(1, &vertexBuffer);
+//    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+//    glBufferData(GL_ARRAY_BUFFER, nv*sizeof(vertex_t), v, GL_STATIC_DRAW);
+//    
+//    GLuint vPosition = glGetAttribLocation(program, "aPosition");
+//    glEnableVertexAttribArray(vPosition);
+//    glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, sizeof(vertex_t), 0);
+//    
+//    
+//    // Bind back to the default state.
+//    glBindBuffer(GL_ARRAY_BUFFER,0);
+//    glBindVertexArrayOES(0);
+//    
+//    numVertices = nv;
+//    dataAvailable = YES;
+//}
 
 
 /**
@@ -218,16 +284,19 @@ const vertex_t vertices2[] = {
     [text appendString:@"-------------------------------------\n\n"];
     NSLog(@"%@", text);
     
-    
 
-    
-    
-    
-    
-    
     
 }
 
+
+- (void)setData
+{
+    // generate texture
+    glGenTextures(1, &dataTexture);
+    glBindTexture(GL_TEXTURE_2D, dataTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); 
+    //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.width, size.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+}
 
 
 /**
@@ -394,9 +463,11 @@ const vertex_t vertices2[] = {
     glUseProgram(program);
     
 	shaderLocation[VERTEX] = glGetAttribLocation(program, "aPosition");
+	shaderLocation[TRANSFORMATION] = glGetAttribLocation(program, "aTransformation");
     shaderLocation[TEXTURE] = glGetUniformLocation(program, "texUnit");
     
     glEnableVertexAttribArray(shaderLocation[VERTEX]);
+    glEnableVertexAttribArray(shaderLocation[TRANSFORMATION]);
     
     [self checkOpenGLError:@"In initShaders"];
 }

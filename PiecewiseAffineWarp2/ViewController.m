@@ -18,8 +18,8 @@
 @synthesize segControl;
 @synthesize PAW;
 
-@synthesize shape1;
-@synthesize shape2;
+//@synthesize shape1;
+//@synthesize shape2;
 
 - (void)viewDidLoad
 {

@@ -15,7 +15,7 @@
 
 enum {
     VERTEX = 0,
-    IDENTIFIER,
+    TRANSFORMATION,
     TEXTURE,
     NUM_LOCATIONS
 };
@@ -32,6 +32,7 @@ enum {
     
     GLuint program;
     GLuint texture;
+    GLuint dataTexture;
     GLuint shaderLocation[NUM_LOCATIONS];
     
     CGSize imgSize;
@@ -52,10 +53,11 @@ typedef unsigned char uchar;
 
 - (void)initOES;
 
-- (void)setupVAO:(const vertex_t*)v :(int)nv :(const triangle_t*)t :(int)nt;
+//- (void)setupVAO:(const vertex_t*)v :(int)nv :(const triangle_t*)t :(int)nt;
 - (void)setupVBO;
-- (void)setupVBO:(const vertex_t*)v :(int)nv :(const triangle_t*)t :(int)nt;
+//- (void)setupVBO:(const vertex_t*)v :(int)nv :(const triangle_t*)t :(int)nt;
 
+- (void)setData;
 - (void)setImage:(UIImage *)image;
 
 - (void)render;
