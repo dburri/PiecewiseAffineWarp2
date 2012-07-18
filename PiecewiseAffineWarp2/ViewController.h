@@ -16,16 +16,16 @@
     IBOutlet UISegmentedControl *segControl;
     PiecewiseAffineWarp *PAW;
     
-//    Shape *shape1;
-//    Shape *shape2;
+    Shape *shape1;
+    Shape *shape2;
 }
 
 @property (retain) IBOutlet UIImageView *imageView;
 @property (retain) IBOutlet UISegmentedControl *segControl;
 @property (nonatomic, retain) PiecewiseAffineWarp *PAW;
 
-//@property (retain) Shape *shape1;
-//@property (retain) Shape *shape2;
+@property (retain) Shape *shape1;
+@property (retain) Shape *shape2;
 
 - (IBAction)loadImageLibrary:(id)sender;
 - (IBAction)loadImageCamera:(id)sender;

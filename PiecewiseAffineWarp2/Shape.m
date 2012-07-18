@@ -44,13 +44,12 @@
         
         for(int i = 0; i < num_vertices; ++i)
         {
-            vertices[i].position[0] = floorf(((double)arc4random() / ARC4RANDOM_MAX) * imgSize.width);
-            vertices[i].position[1] = floorf(((double)arc4random() / ARC4RANDOM_MAX) * imgSize.height);
-            vertices[i].position[2] = 0;
+            vertices[i].pos[0] = floorf(((double)arc4random() / ARC4RANDOM_MAX) * imgSize.width);
+            vertices[i].pos[1] = floorf(((double)arc4random() / ARC4RANDOM_MAX) * imgSize.height);
         }
-        triangles[0].triangle[0] = 0;
-        triangles[0].triangle[1] = 1;
-        triangles[0].triangle[2] = 2;
+        triangles[0].p_index[0] = 0;
+        triangles[0].p_index[1] = 1;
+        triangles[0].p_index[2] = 2;
     }
     
     return self;
@@ -70,15 +69,14 @@
         
         for(int i = 0; i < num_vertices; ++i)
         {
-            vertices[i].position[0] = floorf(((double)arc4random() / ARC4RANDOM_MAX)*10) + s.vertices[i].position[0];
-            vertices[i].position[1] = floorf(((double)arc4random() / ARC4RANDOM_MAX)*10) + s.vertices[i].position[1];
-            vertices[i].position[2] = 0;
+            vertices[i].pos[0] = s.vertices[i].pos[0] + floorf((((double)arc4random() / ARC4RANDOM_MAX) - 0.5) * 100);
+            vertices[i].pos[1] = s.vertices[i].pos[1] + floorf((((double)arc4random() / ARC4RANDOM_MAX) - 0.5) * 100);
         }
         for(int i = 0; i < num_triangles; ++i)
         {
-            triangles[i].triangle[0] = s.triangles[i].triangle[0];
-            triangles[i].triangle[1] = s.triangles[i].triangle[1];
-            triangles[i].triangle[2] = s.triangles[i].triangle[2];
+            triangles[i].p_index[0] = s.triangles[i].p_index[0];
+            triangles[i].p_index[1] = s.triangles[i].p_index[1];
+            triangles[i].p_index[2] = s.triangles[i].p_index[2];
         }
     }
     

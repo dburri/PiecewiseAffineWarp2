@@ -18,8 +18,8 @@
 @synthesize segControl;
 @synthesize PAW;
 
-//@synthesize shape1;
-//@synthesize shape2;
+@synthesize shape1;
+@synthesize shape2;
 
 - (void)viewDidLoad
 {
@@ -44,13 +44,12 @@
 	[picker dismissModalViewControllerAnimated:YES];
     
     UIImage *image = [info objectForKey:@"UIImagePickerControllerOriginalImage"];
-    [PAW setImage:image];
+    
+    shape1 = [[Shape alloc] initWithTestShape:image.size];
+    shape2 = [[Shape alloc] initByRandomModifyGivenShape:shape1];
+    
+    [PAW setImage:image :shape1 :shape2];
 	imageView.image = image;
-    
-    //shape1 = [[Shape alloc] initWithTestShape:image.size];
-    //shape2 = [[Shape alloc] initByRandomModifyGivenShape:shape1];
-    
-    //[PAW setupVBOWithShape:shape1];
     
     [self setImageView];
 }

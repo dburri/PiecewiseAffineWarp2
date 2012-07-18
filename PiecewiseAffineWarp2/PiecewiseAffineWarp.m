@@ -10,9 +10,9 @@
 
 
 typedef struct {
-    GLfloat position[4];
-    GLfloat transformation[8];
-} Vertex;
+    GLfloat posTo[2];
+    GLfloat posFrom[2];
+} vertex_pair_t;
 
 
 
@@ -21,23 +21,15 @@ typedef struct {
 @synthesize originalImage;
 @synthesize warpedImage;
 
-//const vertex_t vertices2[] = {
-//    { 1,  1, 0, 0},
-//    {-1,  1, 0, 0},
-//    {-1, -1, 0, 0},
-//    {-1, -1, 0, 1},
-//    { 1, -1, 0, 1},
-//    { 1,  1, 0, 1}
-//};
 
-const Vertex vertices3[] = {
-    {{ 1,  1, 0, 1}, {0, 0, 1, 0, 5, 6, 0}},
-    {{-1,  1, 0, 1}, {0, 1, 0, 0, 5, 6, 0}},
-    {{-1, -1, 0, 1}, {1, 0, 0, 0, 5, 6, 0}},
-    {{-1, -1, 0, 1}, {1, 1, 0, 0, 5, 6, 0}},
-    {{ 1, -1, 0, 1}, {0, 1, 1, 0, 5, 6, 0}},
-    {{ 1,  1, 0, 1}, {1, 0, 1, 0, 5, 6, 0}}
-};
+//const Vertex vertices3[] = {
+//    {{ 1,  1}, {0.8, 0.8}},
+//    {{0,  1}, {0.2, 0.8}},
+//    {{0, 0}, {0.2, 0.2}},
+//    {{-1, 0}, {0.2, 0.2}},
+//    {{ 1, 0}, {0.8, 0.2}},
+//    {{ 1,  1}, {0.8, 0.8}}
+//};
 
 /**
  Initialize object. Overwriten from NSObject
@@ -58,7 +50,6 @@ const Vertex vertices3[] = {
         
         [self initOES];
         [self initShaders];
-        [self setupVAO:vertices3 :6];
         
         NSLog(@"VertexShader: %@, FragmentShader: %@", fileVShader, fileFShader);
     }
@@ -96,11 +87,9 @@ const Vertex vertices3[] = {
 /**
  Create vertex buffer array object
  */
-- (void)setupVAO:(const Vertex*)v :(int)nv
+- (void)setupVAO:(const vertex_pair_t*)v :(int)nv
 {
     NSLog(@"SETUP VERTEX ARRAY OBJECT");
-    
-    [self checkOpenGLError:@"SetupVAO - at the begin"];
     
     // create and bind vertex array object
     glGenVertexArraysOES(1, &vao);
@@ -110,25 +99,16 @@ const Vertex vertices3[] = {
     GLuint vertexBuffer;
     glGenBuffers(1, &vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, nv*sizeof(Vertex), v, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, nv*sizeof(vertex_pair_t), v, GL_STATIC_DRAW);
     
     
-    [self checkOpenGLError:@"SetupVAO - 1"];
-    
-    GLuint vPosition = glGetAttribLocation(program, "aPosition");
+    GLuint vPosition = glGetAttribLocation(program, "aPosTo");
     glEnableVertexAttribArray(vPosition);
-    glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
+    glVertexAttribPointer(vPosition, 2, GL_FLOAT, GL_FALSE, sizeof(vertex_pair_t), 0);
     
-    
-    [self checkOpenGLError:@"SetupVAO - 2"];
-    
-    GLuint vTransformation = glGetAttribLocation(program, "aTransformation");
-    [self checkOpenGLError:@"SetupVAO - 3"];
+    GLuint vTransformation = glGetAttribLocation(program, "aPosFrom");
     glEnableVertexAttribArray(vTransformation);
-    [self checkOpenGLError:@"SetupVAO - 4"];
-    glVertexAttribPointer(shaderLocation[TRANSFORMATION]+0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(sizeof(float)*4));
-    glVertexAttribPointer(shaderLocation[TRANSFORMATION]+1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(sizeof(float)*8));
-    [self checkOpenGLError:@"SetupVAO - 5"];
+    glVertexAttribPointer(shaderLocation[VERTEX_FROM], 2, GL_FLOAT, GL_FALSE, sizeof(vertex_pair_t), (GLvoid*)(sizeof(float)*2));
     
     
     
@@ -283,19 +263,7 @@ const Vertex vertices3[] = {
     [text appendFormat:@"Extensions = \n%s\n", strExt];
     [text appendString:@"-------------------------------------\n\n"];
     NSLog(@"%@", text);
-    
 
-    
-}
-
-
-- (void)setData
-{
-    // generate texture
-    glGenTextures(1, &dataTexture);
-    glBindTexture(GL_TEXTURE_2D, dataTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); 
-    //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.width, size.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 }
 
 
@@ -303,8 +271,45 @@ const Vertex vertices3[] = {
  Set a new image to process
  @returns An initialized object
  */
-- (void)setImage:(UIImage *)image {
+- (void)setImage:(UIImage *)image :(Shape*)s1 : (Shape*)s2 {
     originalImage = image;
+    
+    
+    
+    // create vertices from shapes
+    assert(s1.num_vertices == s2.num_vertices);
+    NSMutableString *text = [[NSMutableString alloc] init];
+    
+    int num_vertices = s1.num_triangles*3;
+    vertex_pair_t *vertex_pairs = malloc(num_vertices*sizeof(vertex_pair_t));
+    
+    int vpi = 0;
+    for(int i = 0; i < s1.num_triangles; ++i)
+    {
+        const triangle_t *tri = &s1.triangles[i];
+        for(int j = 0; j < 3; ++j)
+        {
+            vertex_pairs[vpi].posFrom[0] = s1.vertices[tri->p_index[j]].pos[0];
+            vertex_pairs[vpi].posFrom[1] = s1.vertices[tri->p_index[j]].pos[1];
+            
+            vertex_pairs[vpi].posTo[0] = s2.vertices[tri->p_index[j]].pos[0];
+            vertex_pairs[vpi].posTo[1] = s2.vertices[tri->p_index[j]].pos[1];
+            
+            [text appendFormat:@"[%f, %f], [%f, %f]\n", vertex_pairs[vpi].posFrom[0], vertex_pairs[vpi].posFrom[1], vertex_pairs[vpi].posTo[0], vertex_pairs[vpi].posTo[1]] ;
+            
+            vpi++;
+        }
+        [text appendFormat:@"\n"];
+    }
+    NSLog(@"Triangles: \n%@", text);
+    
+    
+    
+    
+    [self setupVAO:vertex_pairs :num_vertices];
+    free(vertex_pairs);
+    
+    
     [self setupTexture:image];
     [self render];
     warpedImage = [self readFramebuffer];
@@ -462,12 +467,12 @@ const Vertex vertices3[] = {
     
     glUseProgram(program);
     
-	shaderLocation[VERTEX] = glGetAttribLocation(program, "aPosition");
-	shaderLocation[TRANSFORMATION] = glGetAttribLocation(program, "aTransformation");
+	shaderLocation[VERTEX_TO] = glGetAttribLocation(program, "aPosTo");
+	shaderLocation[VERTEX_FROM] = glGetAttribLocation(program, "aPosFrom");
     shaderLocation[TEXTURE] = glGetUniformLocation(program, "texUnit");
     
-    glEnableVertexAttribArray(shaderLocation[VERTEX]);
-    glEnableVertexAttribArray(shaderLocation[TRANSFORMATION]);
+    glEnableVertexAttribArray(shaderLocation[VERTEX_TO]);
+    glEnableVertexAttribArray(shaderLocation[VERTEX_FROM]);
     
     [self checkOpenGLError:@"In initShaders"];
 }

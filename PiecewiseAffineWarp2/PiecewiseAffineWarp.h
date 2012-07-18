@@ -14,8 +14,8 @@
 #import "Shape.h"
 
 enum {
-    VERTEX = 0,
-    TRANSFORMATION,
+    VERTEX_TO = 0,
+    VERTEX_FROM,
     TEXTURE,
     NUM_LOCATIONS
 };
@@ -53,12 +53,8 @@ typedef unsigned char uchar;
 
 - (void)initOES;
 
-//- (void)setupVAO:(const vertex_t*)v :(int)nv :(const triangle_t*)t :(int)nt;
 - (void)setupVBO;
-//- (void)setupVBO:(const vertex_t*)v :(int)nv :(const triangle_t*)t :(int)nt;
-
-- (void)setData;
-- (void)setImage:(UIImage *)image;
+- (void)setImage:(UIImage *)image :(Shape*)s1 : (Shape*)s2;
 
 - (void)render;
 - (UIImage *)readFramebuffer;

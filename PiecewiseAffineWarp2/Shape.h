@@ -10,11 +10,11 @@
 
 
 typedef struct {
-    GLfloat position[4];
+    float pos[2];
 } vertex_t;
 
 typedef struct {
-    GLubyte triangle[3];
+    unsigned int p_index[3];
 } triangle_t;
 
 
