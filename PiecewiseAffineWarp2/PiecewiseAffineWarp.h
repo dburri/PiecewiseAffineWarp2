@@ -66,6 +66,7 @@ typedef unsigned char uchar;
 - (GLuint)compileShader:(NSString *)file :(GLenum)type;
 
 - (void)checkOpenGLError:(NSString *)msg;
+- (BOOL)checkForExtension:(NSString*)searchName;
 - (uint)findNextPowerOfTwo:(uint)val;
 
 @end

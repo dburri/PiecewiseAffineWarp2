@@ -179,6 +179,53 @@ const vertex_t vertices2[] = {
         NSLog(@"failed to make complete framebuffer object %x", status);
         exit(1);
     }
+    
+    // ---------------------------------
+    // check some stuff
+    
+    GLint myMaxTextureUnits;
+    GLint myMaxTextureSize;
+    GLint myMaxVertexUniformVectors;
+    
+    const GLubyte * strVersion;
+    const GLubyte * strExt;
+    
+    float myGLVersion;
+    
+    
+    strVersion = glGetString (GL_VERSION);
+    sscanf((char *)strVersion, "%f", &myGLVersion);
+    
+    strExt = glGetString(GL_EXTENSIONS);
+    
+    glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &myMaxTextureUnits);
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &myMaxTextureSize); 
+    glGetIntegerv(GL_MAX_VERTEX_UNIFORM_VECTORS, &myMaxVertexUniformVectors);
+    
+    
+    GLboolean isTextureObject;
+    isTextureObject = [self checkForExtension:[NSString stringWithString:@"EXT_texture_buffer_object"]];
+    //isTextureObject = gluCheckExtension((const GLubyte*), strExt); 
+    
+    NSMutableString *text = [[NSMutableString alloc] init];
+    [text appendString:@"\n\n-------------------------------------\n"];
+    [text appendFormat:@"OpenGL Version: %s\n", strVersion];
+    [text appendFormat:@"GL_MAX_TEXTURE_IMAGE_UNITS = %i\n", myMaxTextureUnits];
+    [text appendFormat:@"GL_MAX_TEXTURE_SIZE = %i\n", myMaxTextureSize];
+    [text appendFormat:@"GL_MAX_VERTEX_UNIFORM_VECTORS = %i\n", myMaxVertexUniformVectors];
+    [text appendFormat:@"isTextureObject = %i\n", isTextureObject];
+    [text appendFormat:@"Extensions = \n%s\n", strExt];
+    [text appendString:@"-------------------------------------\n\n"];
+    NSLog(@"%@", text);
+    
+    
+
+    
+    
+    
+    
+    
+    
 }
 
 
@@ -368,6 +415,16 @@ const vertex_t vertices2[] = {
     if ((errCode = glGetError()) != GL_NO_ERROR) {
         NSLog(@"OpenGL Error, Message: %@, Code: %d\n", msg, errCode);
     }
+}
+
+- (BOOL)checkForExtension:(NSString*)searchName
+
+{
+    // For performance, the array can be created once and cached.
+    NSString *extensionsString = [NSString stringWithCString:(const char*)glGetString(GL_EXTENSIONS) encoding: NSASCIIStringEncoding];
+    
+    NSArray *extensionsNames = [extensionsString componentsSeparatedByString:@" "];
+    return [extensionsNames containsObject: searchName];
 }
 
 /**
