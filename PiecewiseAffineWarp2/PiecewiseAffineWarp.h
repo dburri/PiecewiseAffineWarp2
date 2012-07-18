@@ -15,6 +15,7 @@
 
 enum {
     VERTEX = 0,
+    IDENTIFIER,
     TEXTURE,
     NUM_LOCATIONS
 };
@@ -40,7 +41,6 @@ enum {
     GLuint vao;
     BOOL dataAvailable;
     int numVertices;
-    int numIndices;
 }
 
 @property UIImage *originalImage;

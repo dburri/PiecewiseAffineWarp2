@@ -15,12 +15,12 @@
 
 
 const vertex_t vertices2[] = {
-    {1, 1, 0},
-    {-1, 1, 0},
-    {-1, -1, 0},
-    {-1, -1, 0},
-    {1, -1, 0},
-    {1, 1, 0}
+    { 1,  1, 0, 0},
+    {-1,  1, 0, 0},
+    {-1, -1, 0, 0},
+    {-1, -1, 0, 1},
+    { 1, -1, 0, 1},
+    { 1,  1, 0, 1}
 };
 
 /**
@@ -35,7 +35,6 @@ const vertex_t vertices2[] = {
         NSLog(@"INITIALIZE OPENGL!!!");
         
         dataAvailable = NO;
-        numIndices = 0;
         
         fileVShader = @"vShader";
         fileFShader = @"fShader";
@@ -69,14 +68,7 @@ const vertex_t vertices2[] = {
     glClear(GL_COLOR_BUFFER_BIT);
     glViewport(0, 0, imgSize.width, imgSize.height);
     
-    //glVertexAttribPointer(shaderLocation[VERTEX], 3, GL_FLOAT, GL_FALSE, sizeof(vertex_t), 0);
-    //glVertexAttribPointer(shaderLocation[COLOR], 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(sizeof(float)*3));
-    //glVertexAttribPointer(shaderLocation[TEXTURECOORD], 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(sizeof(float)*7));
-    
-    //glDrawElements(GL_TRIANGLES, numIndices, GL_UNSIGNED_BYTE, 0);
-    
     glBindVertexArrayOES(vao);
-    
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture);
@@ -102,7 +94,7 @@ const vertex_t vertices2[] = {
     
     GLuint vPosition = glGetAttribLocation(program, "aPosition");
     glEnableVertexAttribArray(vPosition);
-    glVertexAttribPointer(vPosition, 3, GL_FLOAT, GL_FALSE, sizeof(vertex_t), 0);
+    glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, sizeof(vertex_t), 0);
     
     
     // Bind back to the default state.
@@ -112,74 +104,6 @@ const vertex_t vertices2[] = {
     numVertices = nv;
     dataAvailable = YES;
 }
-
-///**
-// Create vertex buffer array object
-// */
-//- (void)setupVAO:(const vertex_t*)v :(int)nv :(const triangle_t*)t :(int)nt
-//{
-//    // create and bind vertex array object
-//    glGenVertexArraysOES(1, &vao);
-//    glBindVertexArrayOES(vao);
-//    
-//    // create vertex buffer objects
-//    GLuint vertexBuffer;
-//    glGenBuffers(1, &vertexBuffer);
-//    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-//    glBufferData(GL_ARRAY_BUFFER, nv*sizeof(vertex_t), v, GL_STATIC_DRAW);
-//    
-//    GLuint vPosition = glGetAttribLocation(program, "aPosition");
-//    glEnableVertexAttribArray(vPosition);
-//    glVertexAttribPointer(vPosition, 3, GL_FLOAT, GL_FALSE, sizeof(vertex_t), 0);
-//    
-//    GLuint indexBuffer;
-//    glGenBuffers(1, &indexBuffer);
-//    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-//    glBufferData(GL_ELEMENT_ARRAY_BUFFER, nt*sizeof(triangle_t), t, GL_STATIC_DRAW);
-//    
-//    
-//    // Bind back to the default state.
-//    glBindBuffer(GL_ARRAY_BUFFER,0);
-//    glBindVertexArrayOES(0);
-//    
-//    numIndices = nt*3;
-//    dataAvailable = YES;
-//}
-//
-//- (void)setupVBO:(const vertex_t*)v :(int)nv :(const triangle_t*)t :(int)nt
-//{    
-//    GLuint vertexBuffer;
-//    glGenBuffers(1, &vertexBuffer);
-//    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-//    glBufferData(GL_ARRAY_BUFFER, nv*sizeof(vertex_t), v, GL_STATIC_DRAW);
-//    
-//    GLuint indexBuffer;
-//    glGenBuffers(1, &indexBuffer);
-//    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-//    glBufferData(GL_ELEMENT_ARRAY_BUFFER, nt*sizeof(triangle_t), t, GL_STATIC_DRAW);
-//    
-//    numIndices = nt*3;
-//    dataAvailable = YES;
-//}
-
-///**
-// Create vertex buffer array object
-// */
-//- (void)setupVBO
-//{
-//    GLuint vertexBuffer;
-//    glGenBuffers(1, &vertexBuffer);
-//    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-//    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-//    
-//    GLuint indexBuffer;
-//    glGenBuffers(1, &indexBuffer);
-//    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-//    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-//    
-//    numIndices = sizeof(indices)/sizeof(indices[0]);
-//    dataAvailable = YES;
-//}
 
 
 /**
@@ -423,13 +347,9 @@ const vertex_t vertices2[] = {
     glUseProgram(program);
     
 	shaderLocation[VERTEX] = glGetAttribLocation(program, "aPosition");
-	//shaderLocation[COLOR] = glGetAttribLocation(program, "aColor");
-	//shaderLocation[TEXTURECOORD] = glGetAttribLocation(program, "aST");
     shaderLocation[TEXTURE] = glGetUniformLocation(program, "texUnit");
     
     glEnableVertexAttribArray(shaderLocation[VERTEX]);
-    //glEnableVertexAttribArray(shaderLocation[COLOR]);
-    //glEnableVertexAttribArray(shaderLocation[TEXTURECOORD]);
     
     [self checkOpenGLError:@"In initShaders"];
 }
