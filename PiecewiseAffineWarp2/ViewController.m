@@ -49,8 +49,6 @@
     shape2 = [[Shape alloc] initByRandomModifyGivenShape:shape1];
     
     [PAW setImage:image :shape1 :shape2];
-	imageView.image = image;
-    
     [self setImageView];
 }
 
@@ -85,12 +83,12 @@
 {
     switch (segControl.selectedSegmentIndex) {
         case 0:
-            NSLog(@"show original image");
-            imageView.image = PAW.originalImage;
+            NSLog(@"show original image, PAW.originalImage = %@", PAW.originalImage);
+            [imageView setNewImage:PAW.originalImage];
             break;
         case 1:
             NSLog(@"show warped image");
-            imageView.image = PAW.warpedImage;
+            [imageView setNewImage:PAW.warpedImage];
             break;
         default:
             break;

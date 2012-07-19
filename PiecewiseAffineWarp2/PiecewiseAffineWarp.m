@@ -15,6 +15,26 @@ typedef struct {
 } vertex_pair_t;
 
 
+// private methods
+@interface PiecewiseAffineWarp()
+
+- (void)initContext;
+- (void)initOES;
+- (void)deallocOES;
+- (void)render;
+- (UIImage *)readFramebuffer;
+
+- (void)initShaders;
+- (NSString *)loadShaderSource:(NSString *)file;
+- (GLuint)compileShader:(NSString *)file :(GLenum)type;
+
+- (void)checkOpenGLError:(NSString *)msg;
+- (BOOL)checkForExtension:(NSString*)searchName;
+- (uint)findNextPowerOfTwo:(uint)val;
+
+@end
+
+
 
 @implementation PiecewiseAffineWarp
 
@@ -22,39 +42,55 @@ typedef struct {
 @synthesize warpedImage;
 
 
-//const Vertex vertices3[] = {
-//    {{ 1,  1}, {0.8, 0.8}},
-//    {{0,  1}, {0.2, 0.8}},
-//    {{0, 0}, {0.2, 0.2}},
-//    {{-1, 0}, {0.2, 0.2}},
-//    {{ 1, 0}, {0.8, 0.2}},
-//    {{ 1,  1}, {0.8, 0.8}}
-//};
-
 /**
  Initialize object. Overwriten from NSObject
  @returns An initialized object
  */
-- (id)init {
-    
+- (id)init
+{    
     self = [super init];
     
     if (self) {
-        NSLog(@"INITIALIZE OPENGL!!!");
-        
-        dataAvailable = NO;
-        
-        fileVShader = @"vShader";
-        fileFShader = @"fShader";
-        imgSize = CGSizeMake(640, 960);
-        
-        [self initOES];
-        [self initShaders];
-        
-        NSLog(@"VertexShader: %@, FragmentShader: %@", fileVShader, fileFShader);
+        initialized = NO;
+        [self initContext];
+        //[self initShaders];
+        //[self initOpenGLWithSize:CGSizeMake(480, 640)];
+    }
+    return self;
+}
+
+- (void)initOpenGLWithSize:(CGSize)size
+{
+    NSLog(@"--> INITIALIZE OPENGL <--");
+    
+    fileVShader = @"vShader";
+    fileFShader = @"fShader";
+    
+    if(!initialized) {
+        [self deallocOES];
     }
     
-    return self;
+    imgSize = size;
+    [self initOES];
+    [self initShaders];
+    initialized = YES;
+    
+    NSLog(@"VertexShader: %@, FragmentShader: %@", fileVShader, fileFShader);
+}
+
+- (void)deallocOES
+{
+    NSLog(@"Delete all OpenGL stuff!!!");
+    
+    glDeleteTextures(1, &texture);
+    glDeleteBuffers(1, &vertexBuffer);
+    
+    glDeleteShader(shader[SHADER_VERTEX]);
+    glDeleteShader(shader[SHADER_FRAGMENT]);
+    glDeleteProgram(program);
+    
+    glDeleteFramebuffers(1, &framebuffer);
+    glDeleteRenderbuffers(1, &colorRenderbuffer);
 }
 
 
@@ -65,7 +101,13 @@ typedef struct {
 /**
  Render the scene, that is process the image
  */
-- (void)render {
+- (void)render
+{
+    if(!initialized) {
+        NSLog(@"Can't render the scene! OpenGL is not initialized!");
+        return;
+    }
+    
     NSLog(@"Render Image...");
     
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
@@ -89,6 +131,11 @@ typedef struct {
  */
 - (void)setupVAO:(const vertex_pair_t*)v :(int)nv
 {
+    if(!initialized) {
+        NSLog(@"Can't setup VAO! OpenGL is not initialized!");
+        return;
+    }
+    
     NSLog(@"SETUP VERTEX ARRAY OBJECT");
     
     // create and bind vertex array object
@@ -96,7 +143,6 @@ typedef struct {
     glBindVertexArrayOES(vao);
     
     // create vertex buffer objects
-    GLuint vertexBuffer;
     glGenBuffers(1, &vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, nv*sizeof(vertex_pair_t), v, GL_STATIC_DRAW);
@@ -120,43 +166,19 @@ typedef struct {
     [self checkOpenGLError:@"SetupVAO"];
     
     numVertices = nv;
-    dataAvailable = YES;
 }
-
-///**
-// Create vertex buffer array object
-// */
-//- (void)setupVAO:(const vertex_t*)v :(int)nv
-//{
-//    // create and bind vertex array object
-//    glGenVertexArraysOES(1, &vao);
-//    glBindVertexArrayOES(vao);
-//    
-//    // create vertex buffer objects
-//    GLuint vertexBuffer;
-//    glGenBuffers(1, &vertexBuffer);
-//    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-//    glBufferData(GL_ARRAY_BUFFER, nv*sizeof(vertex_t), v, GL_STATIC_DRAW);
-//    
-//    GLuint vPosition = glGetAttribLocation(program, "aPosition");
-//    glEnableVertexAttribArray(vPosition);
-//    glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, sizeof(vertex_t), 0);
-//    
-//    
-//    // Bind back to the default state.
-//    glBindBuffer(GL_ARRAY_BUFFER,0);
-//    glBindVertexArrayOES(0);
-//    
-//    numVertices = nv;
-//    dataAvailable = YES;
-//}
 
 
 /**
  Read the OpenGL Framebuffer
  @returns Content of the framebuffer as an image
  */
-- (UIImage *)readFramebuffer {
+- (UIImage*)readFramebuffer
+{
+    if(!initialized) {
+        NSLog(@"Can't read framebuffer! OpenGL is not initialized!");
+        return nil;
+    }
     
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     unsigned char numValues = 4;
@@ -190,16 +212,13 @@ typedef struct {
         return nil;
     }
     
+    free(imgData);
+    
     return [UIImage imageWithCGImage:imageRef];
 }
 
-
-
-/**
- Initialize OpenGL ES (Context, Framebuffer, Renderbuffer)
- */
-- (void)initOES {
-    
+- (void)initContext
+{
     context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
     if(!context) {
         NSLog(@"Failed to initialize OpenGLES 2.0 context");
@@ -209,8 +228,13 @@ typedef struct {
         NSLog(@"Failed to set current context to OpenGL");
         exit(1);
     }
-    
-    
+}
+
+/**
+ Initialize OpenGL ES (Context, Framebuffer, Renderbuffer)
+ */
+- (void)initOES
+{    
     glGenFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     
@@ -263,7 +287,6 @@ typedef struct {
     [text appendFormat:@"Extensions = \n%s\n", strExt];
     [text appendString:@"-------------------------------------\n\n"];
     NSLog(@"%@", text);
-
 }
 
 
@@ -271,11 +294,10 @@ typedef struct {
  Set a new image to process
  @returns An initialized object
  */
-- (void)setImage:(UIImage *)image :(Shape*)s1 : (Shape*)s2 {
+- (void)setImage:(UIImage *)image :(Shape*)s1 : (Shape*)s2
+{
     originalImage = image;
-    
-    
-    
+
     // create vertices from shapes
     assert(s1.num_vertices == s2.num_vertices);
     NSMutableString *text = [[NSMutableString alloc] init];
@@ -303,16 +325,19 @@ typedef struct {
     }
     NSLog(@"Triangles: \n%@", text);
     
-    
-    
+    if( (initialized == NO) || 
+        (imgSize.width != image.size.width) || 
+        (imgSize.height != image.size.height) )
+    {
+        [self initOpenGLWithSize:image.size];
+    }
     
     [self setupVAO:vertex_pairs :num_vertices];
-    free(vertex_pairs);
-    
-    
     [self setupTexture:image];
     [self render];
     warpedImage = [self readFramebuffer];
+    
+    free(vertex_pairs);
 }
 
 
@@ -321,8 +346,13 @@ typedef struct {
  @param image Image to use as texture
  @returns Handle to texture
  */
-- (void)setupTexture:(UIImage *)image {    
-
+- (void)setupTexture:(UIImage *)image
+{    
+    if(!initialized) {
+        NSLog(@"Can't setup a texture! OpenGL is not initialized!");
+        return;
+    }
+    
     NSLog(@"Setup a new texture with image of size %f x %f...", image.size.width, image.size.height);
     
     // make image size a power of 2
@@ -380,7 +410,8 @@ typedef struct {
  @param file Filename which contains the source
  @returns Source code as a string
  */
-- (NSString *)loadShaderSource:(NSString *)file {
+- (NSString *)loadShaderSource:(NSString *)file
+{
     
     NSError* err;
     NSString *path = [[NSBundle mainBundle] pathForResource:file ofType:@"glsl"];
@@ -402,50 +433,52 @@ typedef struct {
  @param type Shader type
  @returns Handle to shader
  */
-- (GLuint)compileShader:(NSString *)source :(GLenum)type {
+- (GLuint)compileShader:(NSString *)source :(GLenum)type
+{
     
     // load code from file and create shader
     NSString *stringShader = source;
-    GLuint shader = glCreateShader(type);
+    GLuint shaderType = glCreateShader(type);
     
     // set the shader source
     const char *stringShaderUTF8 = [stringShader UTF8String];    
     int stringShaderSize = [stringShader length];
-    glShaderSource(shader, 1, &stringShaderUTF8, &stringShaderSize);
+    glShaderSource(shaderType, 1, &stringShaderUTF8, &stringShaderSize);
 
     // compile shader code
-    glCompileShader(shader);
+    glCompileShader(shaderType);
     
     // check if successfully compiled
     GLint  compiled;
-	glGetShaderiv( shader, GL_COMPILE_STATUS, &compiled );
+	glGetShaderiv(shaderType, GL_COMPILE_STATUS, &compiled );
 	if(!compiled) {
         NSLog(@"Failed to compile shader of type %d", type);
 	    GLint logSize;
-	    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logSize);
+	    glGetShaderiv(shaderType, GL_INFO_LOG_LENGTH, &logSize);
 	    GLchar logMsg[logSize];
-	    glGetShaderInfoLog(shader, logSize, NULL, &logMsg[0]);
+	    glGetShaderInfoLog(shaderType, logSize, NULL, &logMsg[0]);
         NSLog(@"%s", logMsg);
 	    exit(EXIT_FAILURE);
 	}
     
-    return shader;
+    return shaderType;
 }
 
 /**
  Initialize shaders
  */
-- (void)initShaders {
+- (void)initShaders
+{
     
     NSString *stringVShader = [self loadShaderSource:fileVShader];
     NSString *stringFShader = [self loadShaderSource:fileFShader];
     
-    GLuint vShader = [self compileShader:stringVShader :GL_VERTEX_SHADER];
-    GLuint fShader = [self compileShader:stringFShader :GL_FRAGMENT_SHADER];
+    shader[SHADER_VERTEX] = [self compileShader:stringVShader :GL_VERTEX_SHADER];
+    shader[SHADER_FRAGMENT] = [self compileShader:stringFShader :GL_FRAGMENT_SHADER];
     
     program = glCreateProgram();
-    glAttachShader(program, vShader);
-    glAttachShader(program, fShader);
+    glAttachShader(program, shader[SHADER_VERTEX]);
+    glAttachShader(program, shader[SHADER_FRAGMENT]);
     glLinkProgram(program);
     
     // check if linking was successfull
@@ -486,7 +519,8 @@ typedef struct {
  Check for OpenGL ES errors
  @param msg Message to show with error code
  */
-- (void)checkOpenGLError:(NSString *)msg {
+- (void)checkOpenGLError:(NSString *)msg
+{
     GLenum errCode;
     if ((errCode = glGetError()) != GL_NO_ERROR) {
         NSLog(@"OpenGL Error, Message: %@, Code: %d\n", msg, errCode);
@@ -494,7 +528,6 @@ typedef struct {
 }
 
 - (BOOL)checkForExtension:(NSString*)searchName
-
 {
     // For performance, the array can be created once and cached.
     NSString *extensionsString = [NSString stringWithCString:(const char*)glGetString(GL_EXTENSIONS) encoding: NSASCIIStringEncoding];
@@ -509,7 +542,8 @@ typedef struct {
  @param val Value to search the next power of two
  @returns Power of two value
  */
-- (uint)findNextPowerOfTwo:(uint)val {
+- (uint)findNextPowerOfTwo:(uint)val
+{
     val--;
     val = (val >> 1) | val;
     val = (val >> 2) | val;

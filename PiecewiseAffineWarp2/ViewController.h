@@ -8,11 +8,12 @@
 
 #import <UIKit/UIKit.h>
 #import "PiecewiseAffineWarp.h"
-//#include "Shape.h"
+#include "Shape.h"
+#import "View.h"
 
 @interface ViewController : UIViewController < UIImagePickerControllerDelegate, UINavigationControllerDelegate > 
 {
-    IBOutlet UIImageView *imageView;
+    IBOutlet View *imageView;
     IBOutlet UISegmentedControl *segControl;
     PiecewiseAffineWarp *PAW;
     
@@ -20,7 +21,7 @@
     Shape *shape2;
 }
 
-@property (retain) IBOutlet UIImageView *imageView;
+@property (retain) IBOutlet View *imageView;
 @property (retain) IBOutlet UISegmentedControl *segControl;
 @property (nonatomic, retain) PiecewiseAffineWarp *PAW;
 

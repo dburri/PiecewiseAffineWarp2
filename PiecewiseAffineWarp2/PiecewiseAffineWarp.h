@@ -20,8 +20,19 @@ enum {
     NUM_LOCATIONS
 };
 
+enum {
+    SHADER_VERTEX = 0,
+    SHADER_FRAGMENT,
+    NUM_SHADER
+};
+
 @interface PiecewiseAffineWarp : NSObject
 {
+@public
+    UIImage *originalImage;
+    UIImage *warpedImage;
+    
+@private
     EAGLContext *context;
     
     GLuint framebuffer;
@@ -32,16 +43,15 @@ enum {
     
     GLuint program;
     GLuint texture;
-    GLuint dataTexture;
+    GLuint vertexBuffer;
+    GLuint shader[NUM_SHADER];
     GLuint shaderLocation[NUM_LOCATIONS];
     
-    CGSize imgSize;
-    UIImage *originalImage;
-    UIImage *warpedImage;
-    
     GLuint vao;
-    BOOL dataAvailable;
     int numVertices;
+    
+    CGSize imgSize;
+    BOOL initialized;
 }
 
 @property UIImage *originalImage;
@@ -51,20 +61,6 @@ typedef unsigned char uchar;
 
 
 
-- (void)initOES;
-
-- (void)setupVBO;
 - (void)setImage:(UIImage *)image :(Shape*)s1 : (Shape*)s2;
-
-- (void)render;
-- (UIImage *)readFramebuffer;
-
-- (void)initShaders;
-- (NSString *)loadShaderSource:(NSString *)file;
-- (GLuint)compileShader:(NSString *)file :(GLenum)type;
-
-- (void)checkOpenGLError:(NSString *)msg;
-- (BOOL)checkForExtension:(NSString*)searchName;
-- (uint)findNextPowerOfTwo:(uint)val;
 
 @end
