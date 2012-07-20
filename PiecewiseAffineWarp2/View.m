@@ -12,7 +12,7 @@
 
 @implementation View
 
-@synthesize testShape;
+@synthesize shape;
 
 - (id)initWithFrame:(CGRect)frame
 {
@@ -40,7 +40,7 @@
     
 }
 
-- (void)setNewImage:(UIImage*)img
+- (void)setNewImage:(UIImage*)img :(PDMShape*)newShape
 {
     NSLog(@"Set a new image to view with size = %f x %f", img.size.width, img.size.height);
     
@@ -57,6 +57,11 @@
     image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
     
+    
+    self.shape = newShape;
+    
+    
+    
     [self setNeedsDisplay];
 }
 
@@ -67,10 +72,20 @@
 {
     NSLog(@"Draw Rect");
     
-    CGContextRef context = UIGraphicsGetCurrentContext();
-    
     CGRect imgRect = CGRectMake(0, 0, image.size.width, image.size.height);
     [image drawInRect:imgRect];
+    
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextSetLineWidth(context, 3.0f);
+    CGContextSetStrokeColorWithColor(context, [UIColor greenColor].CGColor);
+    CGContextSetFillColorWithColor(context, [UIColor greenColor].CGColor);
+    for(int i = 0; i < shape.num_points; ++i) 
+    {
+        CGPoint p = CGPointMake(shape.shape[i].pos[0]*scale, shape.shape[i].pos[1]*scale);
+        CGContextFillEllipseInRect(context, CGRectMake(p.x-2.5, p.y-2.5, 5, 5));
+    }
+    
+    
 }
 
 

@@ -60,8 +60,6 @@ enum {
 
 typedef unsigned char uchar;
 
-
-
-- (void)setImage:(UIImage *)image :(PDMShape*)s1 :(PDMShape*)s2 :(NSArray*)tri;
+- (UIImage*)warpImage:(UIImage *)image :(PDMShape*)s1 :(PDMShape*)s2 :(NSArray*)tri;
 
 @end

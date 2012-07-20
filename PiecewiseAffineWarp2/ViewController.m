@@ -8,6 +8,9 @@
 
 #import "ViewController.h"
 
+
+#define ARC4RANDOM_MAX      0x100000000
+
 @interface ViewController ()
 
 @end
@@ -17,10 +20,15 @@
 @synthesize imageView;
 @synthesize segControl;
 @synthesize PAW;
+@synthesize PAWCPU;
 @synthesize model;
 
 @synthesize shape1;
 @synthesize shape2;
+
+@synthesize originalImage;
+@synthesize warpedImage;
+
 
 - (void)viewDidLoad
 {
@@ -28,9 +36,9 @@
     
      model = [[PDMShapeModel alloc] init];
     [model loadModel:@"model_xm" :@"model_v" :@"model_d" :@"model_tri"];
-    [model printTriangles];
     
     PAW = [[PiecewiseAffineWarp alloc] init];
+    PAWCPU = [[PiecewiseAffineWarpCPU alloc] init];
 }
 
 - (void)viewDidUnload
@@ -49,28 +57,45 @@
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info {
 	[picker dismissModalViewControllerAnimated:YES];
     
-    UIImage *image = [info objectForKey:@"UIImagePickerControllerOriginalImage"];
+    originalImage = [info objectForKey:@"UIImagePickerControllerOriginalImage"];
     
     shape1 = [model.meanShape getCopy];
     
     // scale and translate shape
     CGRect box = [shape1 getMinBoundingBox];
-    float s1 = image.size.width/box.size.width;
-    float s2 = image.size.height/box.size.height;
+    float s1 = originalImage.size.width/box.size.width;
+    float s2 = originalImage.size.height/box.size.height;
     float s = MIN(s1, s2)/2;
     [shape1 scale:s];
-    [shape1 translate:image.size.height/2 :image.size.width/2];
+    [shape1 translate:originalImage.size.height/2 :originalImage.size.width/2];
     
     
     shape2 = [shape1 getCopy];
     
+    for (int i = 0; i < shape2.num_points; ++i) {
+        for(int j = 0; j < 2; ++j) {
+            shape2.shape[i].pos[j] += floorf(((double)arc4random() / ARC4RANDOM_MAX - 0.5) * 20.);
+        }
+    }
+
     
-    [shape1 printShapeValues];
+    {
+        NSDate *start = [NSDate date];
+        warpedImage = [PAW warpImage:originalImage :shape1 :shape2 :model.triangles];
+        NSDate *stop = [NSDate date];
+        NSTimeInterval dt = [stop timeIntervalSinceDate:start];
+        NSLog(@"Time to perform PAW: %f", dt);
+    }
     
+    {
+        NSDate *start = [NSDate date];
+        warpedImage = [PAWCPU warpImage:originalImage :shape1 :shape2 :model.triangles];
+        NSDate *stop = [NSDate date];
+        NSTimeInterval dt = [stop timeIntervalSinceDate:start];
+        NSLog(@"Time to perform PAWCPU: %f", dt);
+    }
+
     
-    
-    
-    [PAW setImage:image :shape1 :shape2 :model.triangles];
     [self setImageView];
 }
 
@@ -106,11 +131,11 @@
     switch (segControl.selectedSegmentIndex) {
         case 0:
             NSLog(@"show original image, PAW.originalImage = %@", PAW.originalImage);
-            [imageView setNewImage:PAW.originalImage];
+            [imageView setNewImage:originalImage :shape1];
             break;
         case 1:
             NSLog(@"show warped image");
-            [imageView setNewImage:PAW.warpedImage];
+            [imageView setNewImage:warpedImage :shape2];
             break;
         default:
             break;

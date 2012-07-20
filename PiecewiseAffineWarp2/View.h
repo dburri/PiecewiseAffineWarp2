@@ -27,11 +27,11 @@ typedef enum  {
     NSMutableArray *activeTouches;
     NSDate *firstTouchStart;
     
-    PDMShape *testShape;
+    PDMShape *shape;
 }
 
-@property (retain) PDMShape *testShape;
+@property (retain) PDMShape *shape;
 
-- (void)setNewImage:(UIImage*)img;
+- (void)setNewImage:(UIImage*)img :(PDMShape*)newShape;
 
 @end

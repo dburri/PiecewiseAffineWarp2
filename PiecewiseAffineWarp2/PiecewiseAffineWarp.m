@@ -18,6 +18,8 @@ typedef struct {
 // private methods
 @interface PiecewiseAffineWarp()
 
+- (void)setImage:(UIImage *)image :(PDMShape*)s1 :(PDMShape*)s2 :(NSArray*)tri;
+
 - (void)initContext;
 - (void)initOES;
 - (void)deallocOES;
@@ -289,6 +291,12 @@ typedef struct {
     NSLog(@"%@", text);
 }
 
+
+- (UIImage*)warpImage:(UIImage *)image :(PDMShape*)s1 :(PDMShape*)s2 :(NSArray*)tri
+{
+    [self setImage:image :s1 :s2 :tri];
+    return [self readFramebuffer];
+}
 
 /**
  Set a new image to process
