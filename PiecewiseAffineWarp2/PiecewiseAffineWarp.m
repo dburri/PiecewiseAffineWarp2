@@ -294,36 +294,34 @@ typedef struct {
  Set a new image to process
  @returns An initialized object
  */
-- (void)setImage:(UIImage *)image :(Shape*)s1 : (Shape*)s2
+- (void)setImage:(UIImage *)image :(PDMShape*)s1 :(PDMShape*)s2 :(NSArray*) tri
 {
     originalImage = image;
 
     // create vertices from shapes
-    assert(s1.num_vertices == s2.num_vertices);
-    NSMutableString *text = [[NSMutableString alloc] init];
-    
-    int num_vertices = s1.num_triangles*3;
+    assert(s1.num_points == s2.num_points);
+    int num_vertices = 3*[tri count];
     vertex_pair_t *vertex_pairs = malloc(num_vertices*sizeof(vertex_pair_t));
     
+    NSMutableString *tmp = [[NSMutableString alloc] init];
+    
     int vpi = 0;
-    for(int i = 0; i < s1.num_triangles; ++i)
+    for(int i = 0; i < [tri count]; ++i)
     {
-        const triangle_t *tri = &s1.triangles[i];
+        [tmp appendFormat:@"[ "];
+        PDMTriangle *triangle = (PDMTriangle*)[tri objectAtIndex:i];
         for(int j = 0; j < 3; ++j)
         {
-            vertex_pairs[vpi].posFrom[0] = s1.vertices[tri->p_index[j]].pos[0];
-            vertex_pairs[vpi].posFrom[1] = s1.vertices[tri->p_index[j]].pos[1];
+            vertex_pairs[vpi].posFrom[0] = s1.shape[triangle.index[j]].pos[0];
+            vertex_pairs[vpi].posFrom[1] = s1.shape[triangle.index[j]].pos[1];
             
-            vertex_pairs[vpi].posTo[0] = s2.vertices[tri->p_index[j]].pos[0];
-            vertex_pairs[vpi].posTo[1] = s2.vertices[tri->p_index[j]].pos[1];
-            
-            [text appendFormat:@"[%f, %f], [%f, %f]\n", vertex_pairs[vpi].posFrom[0], vertex_pairs[vpi].posFrom[1], vertex_pairs[vpi].posTo[0], vertex_pairs[vpi].posTo[1]] ;
+            vertex_pairs[vpi].posTo[0] = s2.shape[triangle.index[j]].pos[0];
+            vertex_pairs[vpi].posTo[1] = s2.shape[triangle.index[j]].pos[1];
             
             vpi++;
         }
-        [text appendFormat:@"\n"];
+        [tmp appendFormat:@" ]\n"];
     }
-    NSLog(@"Triangles: \n%@", text);
     
     if( (initialized == NO) || 
         (imgSize.width != image.size.width) || 
@@ -414,16 +412,16 @@ typedef struct {
 {
     
     NSError* err;
-    NSString *path = [[NSBundle mainBundle] pathForResource:file ofType:@"glsl"];
-    NSString *shader = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&err];
+    NSString *pathStr = [[NSBundle mainBundle] pathForResource:file ofType:@"glsl"];
+    NSString *shaderStr = [NSString stringWithContentsOfFile:pathStr encoding:NSUTF8StringEncoding error:&err];
     
     //NSLog(@"Shader Code: \n%@", shader);
     
-    if (!shader) {
-        NSLog(@"Couldn't load shader %@: %@", path, err.localizedDescription);
+    if (!shaderStr) {
+        NSLog(@"Couldn't load shader %@: %@", pathStr, err.localizedDescription);
         exit(1);
     }
-    return shader;
+    return shaderStr;
 }
 
 

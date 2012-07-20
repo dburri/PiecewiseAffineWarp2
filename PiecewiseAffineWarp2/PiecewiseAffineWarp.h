@@ -11,7 +11,8 @@
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
 
-#import "Shape.h"
+#import "PDMShape.h"
+#import "PDMTriangle.h"
 
 enum {
     VERTEX_TO = 0,
@@ -61,6 +62,6 @@ typedef unsigned char uchar;
 
 
 
-- (void)setImage:(UIImage *)image :(Shape*)s1 : (Shape*)s2;
+- (void)setImage:(UIImage *)image :(PDMShape*)s1 :(PDMShape*)s2 :(NSArray*)tri;
 
 @end

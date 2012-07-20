@@ -17,6 +17,7 @@
 @synthesize imageView;
 @synthesize segControl;
 @synthesize PAW;
+@synthesize model;
 
 @synthesize shape1;
 @synthesize shape2;
@@ -24,6 +25,11 @@
 - (void)viewDidLoad
 {
     [super viewDidLoad];
+    
+     model = [[PDMShapeModel alloc] init];
+    [model loadModel:@"model_xm" :@"model_v" :@"model_d" :@"model_tri"];
+    [model printTriangles];
+    
     PAW = [[PiecewiseAffineWarp alloc] init];
 }
 
@@ -45,10 +51,26 @@
     
     UIImage *image = [info objectForKey:@"UIImagePickerControllerOriginalImage"];
     
-    shape1 = [[Shape alloc] initWithTestShape:image.size];
-    shape2 = [[Shape alloc] initByRandomModifyGivenShape:shape1];
+    shape1 = [model.meanShape getCopy];
     
-    [PAW setImage:image :shape1 :shape2];
+    // scale and translate shape
+    CGRect box = [shape1 getMinBoundingBox];
+    float s1 = image.size.width/box.size.width;
+    float s2 = image.size.height/box.size.height;
+    float s = MIN(s1, s2)/2;
+    [shape1 scale:s];
+    [shape1 translate:image.size.height/2 :image.size.width/2];
+    
+    
+    shape2 = [shape1 getCopy];
+    
+    
+    [shape1 printShapeValues];
+    
+    
+    
+    
+    [PAW setImage:image :shape1 :shape2 :model.triangles];
     [self setImageView];
 }
 

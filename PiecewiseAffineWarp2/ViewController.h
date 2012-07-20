@@ -8,25 +8,31 @@
 
 #import <UIKit/UIKit.h>
 #import "PiecewiseAffineWarp.h"
-#include "Shape.h"
+
+#import "PDMShapeModel.h"
+#import "PDMShape.h"
+#import "Shape.h"
 #import "View.h"
 
 @interface ViewController : UIViewController < UIImagePickerControllerDelegate, UINavigationControllerDelegate > 
 {
     IBOutlet View *imageView;
     IBOutlet UISegmentedControl *segControl;
+    
+    PDMShapeModel *model;
     PiecewiseAffineWarp *PAW;
     
-    Shape *shape1;
-    Shape *shape2;
+    PDMShape *shape1;
+    PDMShape *shape2;
 }
 
 @property (retain) IBOutlet View *imageView;
 @property (retain) IBOutlet UISegmentedControl *segControl;
 @property (nonatomic, retain) PiecewiseAffineWarp *PAW;
+@property (retain) PDMShapeModel *model;
 
-@property (retain) Shape *shape1;
-@property (retain) Shape *shape2;
+@property (retain) PDMShape *shape1;
+@property (retain) PDMShape *shape2;
 
 - (IBAction)loadImageLibrary:(id)sender;
 - (IBAction)loadImageCamera:(id)sender;

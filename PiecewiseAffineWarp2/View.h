@@ -7,6 +7,7 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "Shape.h"
 
 typedef enum  {
     TOUCH_NONE,
@@ -25,7 +26,11 @@ typedef enum  {
     
     NSMutableArray *activeTouches;
     NSDate *firstTouchStart;
+    
+    PDMShape *testShape;
 }
+
+@property (retain) PDMShape *testShape;
 
 - (void)setNewImage:(UIImage*)img;
 

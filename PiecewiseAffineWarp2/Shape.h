@@ -7,16 +7,13 @@
 //
 
 #import <Foundation/Foundation.h>
+#import "PDMShape.h"
+#import "PDMShapeModel.h"
 
 
 typedef struct {
     float pos[2];
 } vertex_t;
-
-typedef struct {
-    unsigned int p_index[3];
-} triangle_t;
-
 
 @interface Shape : NSObject {
     vertex_t *vertices;
@@ -35,5 +32,6 @@ typedef struct {
 
 - (id)initWithTestShape:(CGSize)imgSize;
 - (id)initByRandomModifyGivenShape:(Shape*)s;
+- (id)initWithPDMShape:(PDMShape*)s :(NSArray*)tri;
 
 @end

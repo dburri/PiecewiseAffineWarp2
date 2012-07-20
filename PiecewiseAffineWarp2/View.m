@@ -8,7 +8,11 @@
 
 #import "View.h"
 
+#define ARC4RANDOM_MAX      0x100000000
+
 @implementation View
+
+@synthesize testShape;
 
 - (id)initWithFrame:(CGRect)frame
 {
@@ -35,7 +39,6 @@
 {
     
 }
-
 
 - (void)setNewImage:(UIImage*)img
 {
