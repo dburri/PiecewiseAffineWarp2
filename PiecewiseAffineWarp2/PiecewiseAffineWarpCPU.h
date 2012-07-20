@@ -14,5 +14,6 @@
 
 
 - (UIImage*)warpImage:(UIImage *)image :(PDMShape*)s1 :(PDMShape*)s2 :(NSArray*)tri;
+- (NSMutableArray*)findPixelIndices:(float*)A :(CGSize)size;
 
 @end

@@ -7,6 +7,7 @@
 //
 
 #import <SenTestingKit/SenTestingKit.h>
+#import "PiecewiseAffineWarpCPU.h"
 
 @interface PiecewiseAffineWarp2Tests : SenTestCase
 

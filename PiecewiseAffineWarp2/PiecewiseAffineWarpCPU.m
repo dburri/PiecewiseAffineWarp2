@@ -12,7 +12,9 @@
 @interface PiecewiseAffineWarpCPU()
 - (BOOL)isPointInsideTriangle:(float)x :(float)y :(float)x1 :(float)y1 :(float)x2 :(float)y2 :(float)x3 :(float)y3;
 - (PDMTMat*)getTransformationMatNB:(float*)A:(float*)B;
-- (NSMutableArray*)findPixelIndices:(float*)A;
+
+- (void)findBorder:(float)x0 :(float)y0 :(float)x1 :(float)y1 :(int**)contour :(int)offset :(int)height;
+- (void)findContourPoints:(NSArray*)points :(int*)border :(int)height :(int)offset;
 @end
 
 @implementation PiecewiseAffineWarpCPU
@@ -48,8 +50,8 @@
     
     // put image into data buffer
     CGImageRef imageRef = [image CGImage];
-    NSUInteger width = CGImageGetWidth(imageRef);
-    NSUInteger height = CGImageGetHeight(imageRef);
+    NSUInteger width = image.size.width;
+    NSUInteger height = image.size.height;
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
     unsigned char *rawData = (unsigned char*) calloc(height * width * 4, sizeof(unsigned char));
     NSUInteger bytesPerPixel = 4;
@@ -59,27 +61,10 @@
                                                  bitsPerComponent, bytesPerRow, colorSpace,
                                                  kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
     CGColorSpaceRelease(colorSpace);
-    
     CGContextDrawImage(context, CGRectMake(0, 0, width, height), imageRef);
-    CGContextRelease(context);
     
-//    //int byteIndex = (bytesPerRow * yy) + xx * bytesPerPixel;
-//    unsigned char *data_ptr = rawData;
-//    for(int yy = 0; yy < height; ++yy)
-//    {
-//        for(int xx = 0; xx < width; ++xx)
-//        {
-//            //for(int i = 0; i < [tri count]; ++i)
-//            //{
-//                //[self isPointInsideTriangle:xx :yy :triangles[i*6] :triangles[i*6+1] :triangles[i*6+2] :triangles[i*6+3] :triangles[i*6+4] :triangles[i*6+5]];
-//            //}
-//            //NSLog(@"byte index = %i", byteIndex);
-//            *data_ptr++ = (xx*255.0)/((float)width);
-//            *data_ptr++ = (yy*255.0)/((float)height);
-//            *data_ptr++ = 0;
-//            *data_ptr++ = 1;
-//        }
-//    }
+
+    
 
     for(int i = 0; i < [trianglePixels count]; ++i)
     {
@@ -88,41 +73,40 @@
         {
             int index = [[triangle objectAtIndex:j] intValue];
             int byteIndex = index * bytesPerPixel;
-            rawData[byteIndex + 0] = 0;
-            rawData[byteIndex + 1] = 1;
-            rawData[byteIndex + 2] = 0;
-            rawData[byteIndex + 3] = 1;
+            rawData[byteIndex + 0] = 255;
+            rawData[byteIndex + 1] = 255;
+            rawData[byteIndex + 2] = 255;
+            rawData[byteIndex + 3] = 255;
         }
     }
+    
+    
+    // DRAW TRIANGLES
+    CGContextSetRGBFillColor(context, 0, 0, 255, 1.);
+    CGContextSetRGBStrokeColor(context, 0, 0, 255, 1.);
+    CGContextSetLineWidth(context, 1.0);
+    for(int i = 0; i < [tri count]; ++i)
+    {
+        PDMTriangle *triangle = [tri objectAtIndex:i];
+        //NSLog(@"\ndraw triangle %i: %i, %i, %i\n(%f, %f), (%f, %f), (%f, %f)", i, triangle.index[0], triangle.index[1], triangle.index[2], s2.shape[triangle.index[0]].pos[0], s2.shape[triangle.index[0]].pos[1], s2.shape[triangle.index[1]].pos[0], s2.shape[triangle.index[1]].pos[1], s2.shape[triangle.index[2]].pos[0], s2.shape[triangle.index[2]].pos[1]);
+        CGContextBeginPath(context);
+        CGContextMoveToPoint(context, s2.shape[triangle.index[0]].pos[0], height-s2.shape[triangle.index[0]].pos[1]);
+        CGContextAddLineToPoint(context, s2.shape[triangle.index[1]].pos[0], height-s2.shape[triangle.index[1]].pos[1]);
+        CGContextAddLineToPoint(context, s2.shape[triangle.index[2]].pos[0], height-s2.shape[triangle.index[2]].pos[1]);
+        CGContextAddLineToPoint(context, s2.shape[triangle.index[0]].pos[0], height-s2.shape[triangle.index[0]].pos[1]);
+        CGContextStrokePath(context);
+    }
+    
+    
+    CGContextRelease(context);
 
-    CGBitmapInfo bitmapInfo = kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Host;
+
+    CGBitmapInfo bitmapInfo = kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big;
     CGContextRef contextRef = CGBitmapContextCreate(rawData, width, height, 8, bytesPerRow, colorSpace, bitmapInfo);
     
     CGImageRef imageRef2 = CGBitmapContextCreateImage(contextRef);
     
-
-
-// DRAW TRIANGLES
-//    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-//    CGContextRef context = CGBitmapContextCreate(NULL, imgSize.width, imgSize.height, 8, 0, colorSpace, kCGImageAlphaPremultipliedLast);
-//    
-//    CGContextSetRGBFillColor(context, (CGFloat)0.0, (CGFloat)0.0, (CGFloat)0.0, (CGFloat)1.0 );
-//
-//    CGContextMoveToPoint(context, 100, 100);
-//    CGContextAddLineToPoint(context, 50, 90);
-//    CGContextAddLineToPoint(context, 90, 80);
-//    CGContextFillPath(context);
-//    CGContextSetLineWidth(context, 1.0);
-//    CGContextStrokePath(context);
-//    CGContextSetFillColorWithColor(context, [[UIColor clearColor] CGColor]);
-//    
-//
-//    CGImageRef cgImage = CGBitmapContextCreateImage(context);
-//    
-//    CGColorSpaceRelease(colorSpace);
-//    CGContextRelease(context);
-//
-//    UIImage *warpedImg = [UIImage imageWithCGImage:cgImage];
+    
     
     UIImage *warpedImg = [UIImage imageWithCGImage:imageRef2];
 
@@ -130,14 +114,16 @@
 }
 
 
+
+
 - (NSMutableArray*)findPixelIndices:(float*)A :(CGSize)size
 {
     NSMutableArray *pixels = [[NSMutableArray alloc] init];
     
-    float x_min = INFINITY;
-    float x_max = -INFINITY;
-    float y_min = INFINITY;
-    float y_max = -INFINITY;
+    double x_min = INFINITY;
+    double x_max = -INFINITY;
+    double y_min = INFINITY;
+    double y_max = -INFINITY;
     
     for(int i = 0; i < 3; ++i) {
         if(x_min > A[i*3+0]) { x_min = A[i*3+0]; }
@@ -145,76 +131,268 @@
         if(y_min > A[i*3+1]) { y_min = A[i*3+1]; }
         if(y_max < A[i*3+1]) { y_max = A[i*3+1]; }
     }
+    double x_min_b = MAX(x_min, 0);
+    double x_max_b = MIN(x_max, size.width-1);
+    double y_min_b = MAX(y_min, 0);
+    double y_max_b = MIN(y_max, size.height-1);
     
-    //NSLog(@"x_min = %f, x_max = %f, x_min = %f, y_max = %f", x_min, x_max, y_min, y_max);
+//    NSLog(@"x_min = %f, x_max = %f, y_min = %f, y_max = %f", x_min, x_max, y_min, y_max);
+//    NSLog(@"x_min_b = %f, x_max_b = %f, y_min_b = %f, y_max_b = %f", x_min_b, x_max_b, y_min_b, y_max_b);
     
-    float m01 = (A[3+1]-A[0+1])/(A[3+0]-A[0+0]);
-    float m02 = (A[6+1]-A[0+1])/(A[6+0]-A[0+0]);
-    float m12 = (A[6+1]-A[3+1])/(A[6+0]-A[3+0]);
+    int difference = (int)y_max_b - (int)y_min_b + 1;
+    int *border = malloc(2*difference*sizeof(int));
+    if(border == NULL) {
+        NSLog(@"Error could not allocate memory...");
+        exit(EXIT_FAILURE);
+    }
     
-    float b01 = (A[3+0]*A[0+1] - A[0+0]*A[3+1]) / (A[3+0] - A[0+0]);
-    float b02 = (A[6+0]*A[0+1] - A[0+0]*A[6+1]) / (A[6+0] - A[0+0]);
-    float b12 = (A[6+0]*A[3+1] - A[3+0]*A[6+1]) / (A[6+0] - A[3+0]);
+    for(int i = 0; i < difference; ++i) {
+        border[i*2] = INFINITY;
+        border[i*2+1] = -INFINITY;
+    }
+    int offset = y_min_b;
+    NSArray *p1 = [self findLinePoints:A[0] :A[1] :A[3] :A[4]];
+    NSArray *p2 = [self findLinePoints:A[0] :A[1] :A[6] :A[7]];
+    NSArray *p3 = [self findLinePoints:A[3] :A[4] :A[6] :A[7]];
     
+    [self findContourPoints:p1 :border :size.height :offset];
+    [self findContourPoints:p2 :border :size.height :offset];
+    [self findContourPoints:p3 :border :size.height :offset];
     
-    int scanline_pos = (int)y_min;
-    int difference = ((int)y_max - (int)y_min);
-    //NSLog(@"scanline_pos = %i, difference = %i", scanline_pos, difference);
-    for(int y_pos = scanline_pos; y_pos < (scanline_pos + difference); ++y_pos)
+    for(int i = 0; i < difference; ++i)
     {
-        float x1 = ((float)y_pos - b01)/m01;
-        float x2 = ((float)y_pos - b02)/m02;
-        float x3 = ((float)y_pos - b12)/m12;
+        int begin = border[i*2];
+        begin = MAX(begin, x_min_b);
+        int end = border[i*2+1];
+        end = MIN(end, x_max_b);
         
-        int begin = 0;
-        int end = 0;
-        if(x1 < x_min) {
-            if(x2 < x3) {
-                begin = (int)x2;
-                end = (int)x3;
-            }
-            else {
-                begin = (int)x3;
-                end = (int)x2;
-            }
-        }
-        else if(x1 < x_min) {
-            if(x1 < x3) {
-                begin = (int)x1;
-                end = (int)x3;
-            }
-            else {
-                begin = (int)x3;
-                end = (int)x1;
-            }
-        }
-        else {
-            if(x1 < x2) {
-                begin = (int)x1;
-                end = (int)x2;
-            }
-            else {
-                begin = (int)x2;
-                end = (int)x1;
-            }
-        }
-        //NSLog(@"\nx1 = %f, x2 = %f, x3 = %f\nbegin = %i, end = %i", x1, x2, x3, begin, end);
-
-        int index = scanline_pos * size.width + begin;
-        for(int i = begin; i < end; ++i) {
+        int index = offset * size.width + i * size.width + begin;
+        for(int i = begin; i <= end; ++i) {
             [pixels addObject:[NSNumber numberWithInt:index]];
             index++;
         }
     }
     
     
-    
+    free(border);
     
     return pixels;
 }
 
 
+/**
+ Determine the pixels which form a line between two points using Bresenham's line algorithm.
+ @returns Array of points [x1, y1, x2, y2, ...., xn, yn]
+ */
+- (NSArray*)findLinePoints:(float)x0 :(float)y0 :(float)x1 :(float)y1
+{
+    NSMutableArray *points = [[NSMutableArray alloc] init];
+    BOOL steep = (abs(y1 - y0) > abs(x1 - x0));
+    
+    float tmp;
+    if (steep) {
+        //swap(x0, y0)
+        tmp = x0;
+        x0 = y0;
+        y0 = tmp;
+        
+        //swap(x1, y1)
+        tmp = x1;
+        x1 = y1;
+        y1 = tmp;
+    }
+    if (x0 > x1) {
+        //swap(x0, x1)
+        tmp = x0;
+        x0 = x1;
+        x1 = tmp;
+        
+        //swap(y0, y1)
+        tmp = y0;
+        y0 = y1;
+        y1 = tmp;
+    }
+    
+    float deltax = x1 - x0;
+    float deltay = abs(y1 - y0);
+    float error = 0;
+    float deltaerr = deltay / deltax;
+    float ystep;
+    float y = y0;
+    
+    
+    if(y0 < y1) {
+        ystep = 1;
+    } else {
+        ystep = -1;
+    }
+    
+    //NSLog(@"deltax = %f, deltay = %f, error = %f, deltaerr = %f, ystep = %f", deltax, deltay, error, deltaerr, ystep);
+    
+    int xx, yy;
+    for (float x = x0; x <= x1; x++) {
+        if(steep) {
+            xx = (int)y;
+            yy = (int)x;
+            
+        } else {
+            xx = (int)x;
+            yy = (int)y;
+        }
+        
+        [points addObject:[NSNumber numberWithInt:xx]];
+        [points addObject:[NSNumber numberWithInt:yy]];
+        
+        error = error + deltaerr;
+        if(error >= 0.5) {
+            y += ystep;
+            error -= 1.0;
+        }
+    }
+    
+    return points;
+}
 
+
+/**
+ Check if a given point is inside a triangle which is defined by three points
+ @param points Array with points as integers in the following format: [x1,y1,x2,y2,...,xn,yn]
+ @param border C-Array of size height x 2 to store the border in. Border will be stored in pairs of x-axis indices {{begin end}, {},..{}} starting at the y-axis offset
+ @param height The height of the contour (= size of the c-array)
+ @param offset Offset where the contour starts in the y-axis
+ */
+- (void)findContourPoints:(NSArray*)points :(int*)border :(int)height :(int)offset
+{
+    for(int i = 0; i < [points count]; i+=2)
+    {
+        int xx = [[points objectAtIndex:i] intValue];
+        int yy = [[points objectAtIndex:i+1] intValue];
+        yy -= offset;
+        if(yy >= 0 && yy <= height)
+        {
+            if(border[yy*2] > xx) {
+                border[yy*2] = xx;
+            }
+            if(border[yy*2+1] < xx) {
+                border[yy*2+1] = xx;
+            }
+        }
+    }
+}
+
+
+/**
+ Deprecated version to find pixel indices
+ */
+//- (NSMutableArray*)findPixelIndices:(float*)A :(CGSize)size
+//{
+//    NSMutableArray *pixels = [[NSMutableArray alloc] init];
+//    
+//    double x_min = INFINITY;
+//    double x_max = -INFINITY;
+//    double y_min = INFINITY;
+//    double y_max = -INFINITY;
+//    
+//    for(int i = 0; i < 3; ++i) {
+//        if(x_min > A[i*3+0]) { x_min = A[i*3+0]; }
+//        if(x_max < A[i*3+0]) { x_max = A[i*3+0]; }
+//        if(y_min > A[i*3+1]) { y_min = A[i*3+1]; }
+//        if(y_max < A[i*3+1]) { y_max = A[i*3+1]; }
+//    }
+//    double x_min_b = MAX(x_min, 0);
+//    double x_max_b = MIN(x_max, size.width-1);
+//    double y_min_b = MAX(y_min, 0);
+//    double y_max_b = MIN(y_max, size.height-1);
+//    
+//    NSLog(@"x_min = %f, x_max = %f, y_min = %f, y_max = %f", x_min, x_max, y_min, y_max);
+//    NSLog(@"x_min_b = %f, x_max_b = %f, y_min_b = %f, y_max_b = %f", x_min_b, x_max_b, y_min_b, y_max_b);
+//    
+//    double div01 = (A[3+0]-A[0+0]) + 0.000001;
+//    double div02 = (A[6+0]-A[0+0]) + 0.000001;
+//    double div12 = (A[6+0]-A[3+0]) + 0.000001;
+//    
+//    double m01 = (A[3+1]-A[0+1])/div01;
+//    double m02 = (A[6+1]-A[0+1])/div02;
+//    double m12 = (A[6+1]-A[3+1])/div12;
+//    
+//    double b01 = (A[3+0]*A[0+1] - A[0+0]*A[3+1])/div01;
+//    double b02 = (A[6+0]*A[0+1] - A[0+0]*A[6+1])/div02;
+//    double b12 = (A[6+0]*A[3+1] - A[3+0]*A[6+1])/div12;
+//    
+//    double xc = (A[0] + A[3] + A[6])/3;
+//    double yc = (A[1] + A[4] + A[7])/3;
+//    
+//    double sc1 = 0.5/sqrt((A[0] - xc)*(A[0] - xc) + (A[1] - yc)*(A[1] - yc));
+//    double xc1 = A[0] + (A[0] - xc)*sc1;
+//    double yc1 = A[1] + (A[1] - yc)*sc1;
+//    
+//    double sc2 = 0.5/sqrt((A[3] - xc)*(A[3] - xc) + (A[4] - yc)*(A[4] - yc));
+//    double xc2 = A[3] + (A[3] - xc)*sc2;
+//    double yc2 = A[4] + (A[4] - yc)*sc2;
+//    
+//    double sc3 = 0.5/sqrt((A[6] - xc)*(A[6] - xc) + (A[7] - yc)*(A[7] - yc));
+//    double xc3 = A[6] + (A[6] - xc)*sc3;
+//    double yc3 = A[7] + (A[7] - yc)*sc3;
+//    
+//    NSLog(@"\nshifted triangle: [%f, %f], [%f, %f], [%f, %f]", xc1, yc1, xc2, yc2, xc3, yc3);
+//    
+//    
+//    int scanline_pos = (int)y_min_b;
+//    int difference = ((int)y_max_b - (int)y_min_b);
+//    NSLog(@"scanline_pos = %i, difference = %i", scanline_pos, difference);
+//    for(int y_pos = scanline_pos; y_pos <= (scanline_pos + difference); ++y_pos)
+//    {
+//        double x1 = ((double)y_pos - b01)/m01;
+//        double x2 = ((double)y_pos - b02)/m02;
+//        double x3 = ((double)y_pos - b12)/m12;
+//        double a1 = 0;
+//        double a2 = 0;
+//        
+//        BOOL x1b = [self isPointInsideTriangle:x1 :y_pos :xc1 :yc1 :xc2 :yc2 :xc3 :yc3];
+//        BOOL x2b = [self isPointInsideTriangle:x2 :y_pos :xc1 :yc1 :xc2 :yc2 :xc3 :yc3];
+//        BOOL x3b = [self isPointInsideTriangle:x3 :y_pos :xc1 :yc1 :xc2 :yc2 :xc3 :yc3];
+//
+//        if(x1b && x2b) {
+//            a1 = x1;
+//            a2 = x2;
+//        }
+//        else if(x1b && x3b) {
+//            a1 = x1;
+//            a2 = x3;
+//        }
+//        else{
+//            a1 = x2;
+//            a2 = x3;
+//        }
+//        
+//        int begin = round(MIN(a1,a2));
+//        int end = round(MAX(a1,a2));
+//        
+//        if(begin > size.width || end < 0)
+//            continue;
+//        
+//        // clamp to image borders
+//        begin = MAX(begin, x_min_b);
+//        end = MIN(end, x_max_b);
+//        
+//        NSLog(@"\ny = %i, x1 = %f, x2 = %f, x3 = %f\nbegin = %i, end = %i", y_pos, x1, x2, x3, begin, end);
+//        
+//        int index = y_pos * size.width + begin;
+//        for(int i = begin; i <= end; ++i) {
+//            [pixels addObject:[NSNumber numberWithInt:index]];
+//            index++;
+//        }
+//    }
+//    
+//    return pixels;
+//}
+
+
+
+/**
+ Check if a given point is inside a triangle which is defined by three points
+ @returns YES if the point is inside
+ */
 - (BOOL)isPointInsideTriangle:(float)x :(float)y :(float)xa :(float)ya :(float)xb :(float)yb :(float)xc :(float)yc
 {
     float vbx = xb-xa;
@@ -237,29 +415,13 @@
     float v = (dot00 * dot12 - dot01 * dot02) * invDenom;
 
     return (u >= 0) && (v >= 0) && (u + v < 1);
-
-//// Compute vectors        
-//v0 = C - A
-//v1 = B - A
-//v2 = P - A
-//
-//// Compute dot products
-//dot00 = dot(v0, v0)
-//dot01 = dot(v0, v1)
-//dot02 = dot(v0, v2)
-//dot11 = dot(v1, v1)
-//dot12 = dot(v1, v2)
-//
-//// Compute barycentric coordinates
-//invDenom = 1 / (dot00 * dot11 - dot01 * dot01)
-//u = (dot11 * dot02 - dot01 * dot12) * invDenom
-//v = (dot00 * dot12 - dot01 * dot02) * invDenom
-//
-//// Check if point is in triangle
-//return (u >= 0) && (v >= 0) && (u + v < 1)
-
 }
 
+
+/**
+ Determine the transformation matrix given a pair of triangles
+ @returns Transformation matrix
+ */
 - (PDMTMat*)getTransformationMatNB:(float*)A:(float*)B
 {
     PDMTMat *mat = [[PDMTMat alloc] init];

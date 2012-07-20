@@ -70,8 +70,6 @@
 // An empty implementation adversely affects performance during animation.
 - (void)drawRect:(CGRect)rect
 {
-    NSLog(@"Draw Rect");
-    
     CGRect imgRect = CGRectMake(0, 0, image.size.width, image.size.height);
     [image drawInRect:imgRect];
     
