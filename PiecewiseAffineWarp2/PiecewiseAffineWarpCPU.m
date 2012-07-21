@@ -21,6 +21,11 @@
     
     NSLog(@"Perform PAW on CPU");
     
+//    if(image.imageOrientation != UIImageOrientationUp) {
+//        NSLog(@"PAW on the CPU supports only uppright images...");
+//        exit(EXIT_FAILURE);
+//    }
+    
     // determine transformation matrix for every triangle pair
     // as well as all pixels in the destination triangle
     NSMutableArray *transformations = [[NSMutableArray alloc] init];
@@ -131,20 +136,25 @@
     
     // create UIImage with data 
     CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, rawData2, width * height * 4, NULL);
-    CGImageRef imageRef3;
-    if (image.imageOrientation == UIImageOrientationUp || image.imageOrientation == UIImageOrientationDown) {
-        NSLog(@"IMAGE ORIENTATION IS UP");
-        
-        imageRef3 = CGImageCreate(width, height, bitsPerComponent, bytesPerPixel*8, bytesPerRow, colorSpace, bitmapInfo, provider, NULL, false, kCGRenderingIntentDefault);
-    } else {
-        NSLog(@"IMAGE ORIENTATION IS SIDEWAYS");
-        imageRef3 = CGImageCreate(height, width, bitsPerComponent, bytesPerPixel*8, bytesPerRow, colorSpace, bitmapInfo, provider, NULL, false, kCGRenderingIntentDefault);
-    }   
+    CGImageRef imageRef3= CGImageCreate(width, height, bitsPerComponent, bytesPerPixel*8, bytesPerRow, colorSpace, bitmapInfo, provider, NULL, false, kCGRenderingIntentDefault);
+    
+//    if (image.imageOrientation == UIImageOrientationUp || image.imageOrientation == UIImageOrientationDown) {
+//        NSLog(@"IMAGE ORIENTATION IS UP");
+//        
+//        imageRef3 = CGImageCreate(width, height, bitsPerComponent, bytesPerPixel*8, bytesPerRow, colorSpace, bitmapInfo, provider, NULL, false, kCGRenderingIntentDefault);
+//    } else {
+//        NSLog(@"IMAGE ORIENTATION IS SIDEWAYS");
+//        imageRef3 = CGImageCreate(height, width, bitsPerComponent, bytesPerPixel*8, bytesPerRow, colorSpace, bitmapInfo, provider, NULL, false, kCGRenderingIntentDefault);
+//    }   
     
     //free(rawData1);
     //free(rawData2);
     
-    UIImage *warpedImg = [UIImage imageWithCGImage:imageRef3];
+    CGDataProviderRelease(provider);
+    
+    UIImage *warpedImg = [UIImage imageWithCGImage:imageRef3 scale:1.0 orientation:image.imageOrientation];
+    CGImageRelease(imageRef3);
+    
     return warpedImg;
 }
 

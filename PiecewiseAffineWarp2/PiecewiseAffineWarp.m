@@ -8,6 +8,8 @@
 
 #import "PiecewiseAffineWarp.h"
 
+#undef DEBUG
+
 
 typedef struct {
     GLfloat posTo[2];
@@ -63,7 +65,6 @@ typedef struct {
 
 - (void)initOpenGLWithSize:(CGSize)size
 {
-    NSLog(@"--> INITIALIZE OPENGL <--");
     
     fileVShader = @"vShader";
     fileFShader = @"fShader";
@@ -77,12 +78,17 @@ typedef struct {
     [self initShaders];
     initialized = YES;
     
+#ifdef DEBUG
+    NSLog(@"--> INITIALIZE OPENGL <--");
     NSLog(@"VertexShader: %@, FragmentShader: %@", fileVShader, fileFShader);
+#endif
 }
 
 - (void)deallocOES
 {
+#ifdef DEBUG
     NSLog(@"Delete all OpenGL stuff!!!");
+#endif
     
     glDeleteTextures(1, &texture);
     glDeleteBuffers(1, &vertexBuffer);
@@ -138,7 +144,7 @@ typedef struct {
         return;
     }
     
-    NSLog(@"SETUP VERTEX ARRAY OBJECT");
+    //NSLog(@"SETUP VERTEX ARRAY OBJECT");
     
     // create and bind vertex array object
     glGenVertexArraysOES(1, &vao);
@@ -185,39 +191,49 @@ typedef struct {
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     unsigned char numValues = 4;
     uint dataSize = (uint)(imgSize.width*imgSize.height*numValues);
-    NSLog(@"Read number of bytes: %d", dataSize);
     unsigned char *imgData = (unsigned char *)malloc(dataSize);
     if(!imgData) {
         NSLog(@"Could not allocate buffer to retrieve pixels...");
-        return nil;
+        exit(EXIT_FAILURE);
     }
     glReadPixels(0, 0, imgSize.width, imgSize.height, GL_RGBA, GL_UNSIGNED_BYTE, imgData);
     
     GLenum error = glGetError();
     if(error != 0) {
         NSLog(@"Could not read pixels from buffer: %d", error);
-        return nil;
+        exit(EXIT_FAILURE);
     }
     
     
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
     CGBitmapInfo bitmapInfo = kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Host;
     CGContextRef contextRef = CGBitmapContextCreate(imgData, imgSize.width, imgSize.height, 8, numValues*imgSize.width, colorSpace, bitmapInfo);
+    
+    bool returnError = false;
     if (!contextRef) {
         NSLog(@"Unable to create CGContextRef...");
-        return nil;
+        returnError = true;
     }
     
     CGImageRef imageRef = CGBitmapContextCreateImage(contextRef);
     if (!imageRef) {
         NSLog(@"Unable to create CGImageRef.");
-        return nil;
+        returnError = true;
     }
     
+    CGColorSpaceRelease(colorSpace);
     CGContextRelease(contextRef);
     free(imgData);
     
-    return [UIImage imageWithCGImage:imageRef];
+    if(returnError == true) {
+        CGImageRelease(imageRef);
+        return nil;
+    }
+    
+    UIImage *img = [UIImage imageWithCGImage:imageRef];
+    CGImageRelease(imageRef);
+    
+    return img;
 }
 
 - (void)initContext
@@ -253,6 +269,7 @@ typedef struct {
         exit(1);
     }
     
+#ifdef DEBUG
     // ---------------------------------
     // check some stuff
     
@@ -290,6 +307,7 @@ typedef struct {
     [text appendFormat:@"Extensions = \n%s\n", strExt];
     [text appendString:@"-------------------------------------\n\n"];
     NSLog(@"%@", text);
+#endif
 }
 
 
@@ -360,7 +378,9 @@ typedef struct {
         return;
     }
     
+#ifdef DEBUG
     NSLog(@"Setup a new texture with image of size %f x %f...", image.size.width, image.size.height);
+#endif
     
     // make image size a power of 2
     CGSize sizeNPOT = image.size;
