@@ -115,7 +115,7 @@ typedef struct {
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, colorRenderbuffer);
     
-    glClearColor(0.5, 0., 0.5, 1.0);
+    glClearColor(0., 0., 0., 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
     glViewport(0, 0, imgSize.width, imgSize.height);
     
