@@ -12,9 +12,6 @@
 @interface PiecewiseAffineWarpCPU()
 - (BOOL)isPointInsideTriangle:(float)x :(float)y :(float)x1 :(float)y1 :(float)x2 :(float)y2 :(float)x3 :(float)y3;
 - (PDMTMat*)getTransformationMatNB:(float*)A:(float*)B;
-
-- (void)findBorder:(float)x0 :(float)y0 :(float)x1 :(float)y1 :(int**)contour :(int)offset :(int)height;
-- (void)findContourPoints:(NSArray*)points :(int*)border :(int)height :(int)offset;
 @end
 
 @implementation PiecewiseAffineWarpCPU
@@ -22,7 +19,10 @@
 - (UIImage*)warpImage:(UIImage *)image :(PDMShape*)s1 :(PDMShape*)s2 :(NSArray*)tri
 {
     
+    NSLog(@"Perform PAW on CPU");
+    
     // determine transformation matrix for every triangle pair
+    // as well as all pixels in the destination triangle
     NSMutableArray *transformations = [[NSMutableArray alloc] init];
     NSMutableArray *trianglePixels = [[NSMutableArray alloc] init];
     
@@ -33,89 +33,126 @@
         for (int j = 0; j < 3; ++j) {
             points1[j*3+0] = s1.shape[triangle.index[j]].pos[0];
             points1[j*3+1] = s1.shape[triangle.index[j]].pos[1];
-            points1[j*3+2] = 0;
+            points1[j*3+2] = 1;
             
             points2[j*3+0] = s2.shape[triangle.index[j]].pos[0];
             points2[j*3+1] = s2.shape[triangle.index[j]].pos[1];
-            points2[j*3+2] = 0;
+            points2[j*3+2] = 1;
         }
-        [transformations addObject:[self getTransformationMatNB:&points1[0] :&points2[0]]];
+        PDMTMat *Tmat = [self getTransformationMatNB:&points2[0] :&points1[0]];
+        [transformations addObject:Tmat];
         
         NSMutableArray *pixels = [self findPixelIndices:&points2[0] :image.size];
         [trianglePixels addObject:pixels];
     }
 
 
-    // go through the whole image and determine pixel value
+    // image definitions
     
-    // put image into data buffer
-    CGImageRef imageRef = [image CGImage];
-    NSUInteger width = image.size.width;
-    NSUInteger height = image.size.height;
+    float width = image.size.width;
+    float height = image.size.height;
+    
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-    unsigned char *rawData = (unsigned char*) calloc(height * width * 4, sizeof(unsigned char));
     NSUInteger bytesPerPixel = 4;
-    NSUInteger bytesPerRow = bytesPerPixel * width;
+    NSUInteger bytesPerRow = bytesPerPixel*width;
     NSUInteger bitsPerComponent = 8;
-    CGContextRef context = CGBitmapContextCreate(rawData, width, height,
-                                                 bitsPerComponent, bytesPerRow, colorSpace,
-                                                 kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
-    CGColorSpaceRelease(colorSpace);
-    CGContextDrawImage(context, CGRectMake(0, 0, width, height), imageRef);
+    CGBitmapInfo bitmapInfo = kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big;
+    
+    // source image
+    unsigned char *rawData1 = (unsigned char*) calloc(height * width * 4, sizeof(unsigned char));
+    CGImageRef imageRef1 = [image CGImage];
+    CGContextRef context = CGBitmapContextCreate(rawData1, width, height, bitsPerComponent, bytesPerRow, colorSpace, kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
     
 
     
+//    if (image.imageOrientation == UIImageOrientationUp || image.imageOrientation == UIImageOrientationDown) {
+//        NSLog(@"IMAGE ORIENTATION IS UP");
+//        context = CGBitmapContextCreate(rawData1, width, height, bitsPerComponent, bytesPerRow, colorSpace, bitmapInfo);
+//    } else {
+//        NSLog(@"IMAGE ORIENTATION IS SIDEWAYS");
+//        width = image.size.height;
+//        height = image.size.width;
+//        context = CGBitmapContextCreate(rawData1, height, width, bitsPerComponent, bytesPerRow, colorSpace, bitmapInfo);
+//    }       
+//    
+//    if (image.imageOrientation == UIImageOrientationLeft) {
+//        CGContextRotateCTM(context, M_PI_2);
+//        CGContextTranslateCTM(context, 0, -height);
+//        
+//    } else if (image.imageOrientation == UIImageOrientationRight) {
+//        CGContextRotateCTM(context, -M_PI_2);
+//        CGContextTranslateCTM(context, -width, 0);
+//        
+//    } else if (image.imageOrientation == UIImageOrientationUp) {
+//        // NOTHING
+//    } else if (image.imageOrientation == UIImageOrientationDown) {
+//        CGContextTranslateCTM(context, width, height);
+//        CGContextRotateCTM(context, -M_PI);
+//    }
+
+    CGContextDrawImage(context, CGRectMake(0, 0, width, height), imageRef1);
+    //CGImageRef imageRef2 = CGBitmapContextCreateImage(context);
+    CGColorSpaceRelease(colorSpace);
+    CGContextRelease(context);
+
+    
+    // destination image
+    unsigned char *rawData2 = (unsigned char*) calloc(height * width * 4, sizeof(unsigned char));
+
 
     for(int i = 0; i < [trianglePixels count]; ++i)
     {
+        PDMTMat *T = [transformations objectAtIndex:i];
+        
         NSMutableArray *triangle = [trianglePixels objectAtIndex:i];
         for(int j = 0; j < [triangle count]; ++j)
         {
             int index = [[triangle objectAtIndex:j] intValue];
-            int byteIndex = index * bytesPerPixel;
-            rawData[byteIndex + 0] = 255;
-            rawData[byteIndex + 1] = 255;
-            rawData[byteIndex + 2] = 255;
-            rawData[byteIndex + 3] = 255;
+            float xto = (index%(int)width);
+            float yto = floor(index/width);
+            
+            int xfrom = (int)(xto * T.T[0] + yto * T.T[3] + T.T[6]); 
+            int yfrom = (int)(xto * T.T[1] + yto * T.T[4] + T.T[7]);
+            
+            if(xfrom < 0 || xfrom >= width)
+                continue;
+            if(yfrom < 0 || yfrom >= height)
+                continue;
+            
+            
+            int byteIndex1 = yfrom * width * 4 + xfrom * 4;
+            int byteIndex2 = yto * width * 4 + xto * 4;
+            rawData2[byteIndex2 + 0] = rawData1[byteIndex1 + 0];
+            rawData2[byteIndex2 + 1] = rawData1[byteIndex1 + 1];
+            rawData2[byteIndex2 + 2] = rawData1[byteIndex1 + 2];
+            rawData2[byteIndex2 + 3] = rawData1[byteIndex1 + 3];
         }
     }
     
+    // create UIImage with data 
+    CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, rawData2, width * height * 4, NULL);
+    CGImageRef imageRef3;
+    if (image.imageOrientation == UIImageOrientationUp || image.imageOrientation == UIImageOrientationDown) {
+        NSLog(@"IMAGE ORIENTATION IS UP");
+        
+        imageRef3 = CGImageCreate(width, height, bitsPerComponent, bytesPerPixel*8, bytesPerRow, colorSpace, bitmapInfo, provider, NULL, false, kCGRenderingIntentDefault);
+    } else {
+        NSLog(@"IMAGE ORIENTATION IS SIDEWAYS");
+        imageRef3 = CGImageCreate(height, width, bitsPerComponent, bytesPerPixel*8, bytesPerRow, colorSpace, bitmapInfo, provider, NULL, false, kCGRenderingIntentDefault);
+    }   
     
-    // DRAW TRIANGLES
-    CGContextSetRGBFillColor(context, 0, 0, 255, 1.);
-    CGContextSetRGBStrokeColor(context, 0, 0, 255, 1.);
-    CGContextSetLineWidth(context, 1.0);
-    for(int i = 0; i < [tri count]; ++i)
-    {
-        PDMTriangle *triangle = [tri objectAtIndex:i];
-        //NSLog(@"\ndraw triangle %i: %i, %i, %i\n(%f, %f), (%f, %f), (%f, %f)", i, triangle.index[0], triangle.index[1], triangle.index[2], s2.shape[triangle.index[0]].pos[0], s2.shape[triangle.index[0]].pos[1], s2.shape[triangle.index[1]].pos[0], s2.shape[triangle.index[1]].pos[1], s2.shape[triangle.index[2]].pos[0], s2.shape[triangle.index[2]].pos[1]);
-        CGContextBeginPath(context);
-        CGContextMoveToPoint(context, s2.shape[triangle.index[0]].pos[0], height-s2.shape[triangle.index[0]].pos[1]);
-        CGContextAddLineToPoint(context, s2.shape[triangle.index[1]].pos[0], height-s2.shape[triangle.index[1]].pos[1]);
-        CGContextAddLineToPoint(context, s2.shape[triangle.index[2]].pos[0], height-s2.shape[triangle.index[2]].pos[1]);
-        CGContextAddLineToPoint(context, s2.shape[triangle.index[0]].pos[0], height-s2.shape[triangle.index[0]].pos[1]);
-        CGContextStrokePath(context);
-    }
+    //free(rawData1);
+    //free(rawData2);
     
-    
-    CGContextRelease(context);
-
-
-    CGBitmapInfo bitmapInfo = kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big;
-    CGContextRef contextRef = CGBitmapContextCreate(rawData, width, height, 8, bytesPerRow, colorSpace, bitmapInfo);
-    
-    CGImageRef imageRef2 = CGBitmapContextCreateImage(contextRef);
-    
-    
-    
-    UIImage *warpedImg = [UIImage imageWithCGImage:imageRef2];
-
+    UIImage *warpedImg = [UIImage imageWithCGImage:imageRef3];
     return warpedImg;
 }
 
 
-
-
+/**
+ Find the pixel indices for each triangle
+ @returns Array of array of points [x1, y1, x2, y2, ...., xn, yn]
+ */
 - (NSMutableArray*)findPixelIndices:(float*)A :(CGSize)size
 {
     NSMutableArray *pixels = [[NSMutableArray alloc] init];
@@ -155,9 +192,9 @@
     NSArray *p2 = [self findLinePoints:A[0] :A[1] :A[6] :A[7]];
     NSArray *p3 = [self findLinePoints:A[3] :A[4] :A[6] :A[7]];
     
-    [self findContourPoints:p1 :border :size.height :offset];
-    [self findContourPoints:p2 :border :size.height :offset];
-    [self findContourPoints:p3 :border :size.height :offset];
+    [self findContourPoints:p1 :border :difference :offset];
+    [self findContourPoints:p2 :border :difference :offset];
+    [self findContourPoints:p3 :border :difference :offset];
     
     for(int i = 0; i < difference; ++i)
     {
@@ -166,7 +203,7 @@
         int end = border[i*2+1];
         end = MIN(end, x_max_b);
         
-        int index = offset * size.width + i * size.width + begin;
+        int index = (offset + i) * size.width + begin;
         for(int i = begin; i <= end; ++i) {
             [pixels addObject:[NSNumber numberWithInt:index]];
             index++;
@@ -263,12 +300,15 @@
  */
 - (void)findContourPoints:(NSArray*)points :(int*)border :(int)height :(int)offset
 {
-    for(int i = 0; i < [points count]; i+=2)
+    int xx = 0;
+    int yy = 0;
+    for(int i = 0; i < [points count]; i += 2)
     {
-        int xx = [[points objectAtIndex:i] intValue];
-        int yy = [[points objectAtIndex:i+1] intValue];
+        xx = [[points objectAtIndex:i] intValue];
+        yy = [[points objectAtIndex:i+1] intValue];
         yy -= offset;
-        if(yy >= 0 && yy <= height)
+        //NSLog(@"%i : xx = %i, yy = %i", i, xx, yy);
+        if(yy >= 0 && yy < height)
         {
             if(border[yy*2] > xx) {
                 border[yy*2] = xx;

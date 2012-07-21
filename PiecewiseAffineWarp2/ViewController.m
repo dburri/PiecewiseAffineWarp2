@@ -65,18 +65,19 @@
     CGRect box = [shape1 getMinBoundingBox];
     float s1 = originalImage.size.width/box.size.width;
     float s2 = originalImage.size.height/box.size.height;
-    float s = MIN(s1, s2);
+    float s = MIN(s1, s2)/2;
     [shape1 scale:s];
     [shape1 translate:originalImage.size.height/2 :originalImage.size.width/2];
     
     
     shape2 = [shape1 getCopy];
     
-//    for (int i = 0; i < shape2.num_points; ++i) {
-//        for(int j = 0; j < 2; ++j) {
-//            shape2.shape[i].pos[j] += floorf(((double)arc4random() / ARC4RANDOM_MAX - 0.5) * 20.);
-//        }
-//    }
+    for (int i = 0; i < shape2.num_points; ++i) {
+        for(int j = 0; j < 2; ++j) {
+            shape2.shape[i].pos[j] += floorf(((double)arc4random() / ARC4RANDOM_MAX - 0.5) * 20.) - 20;
+            //shape2.shape[i].pos[j] -= 20;
+        }
+    }
 
     
     {

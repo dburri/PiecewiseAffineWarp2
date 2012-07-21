@@ -214,6 +214,7 @@ typedef struct {
         return nil;
     }
     
+    CGContextRelease(contextRef);
     free(imgData);
     
     return [UIImage imageWithCGImage:imageRef];
