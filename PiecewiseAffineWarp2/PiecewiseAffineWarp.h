@@ -53,6 +53,7 @@ enum {
     
     CGSize imgSize;
     BOOL initialized;
+    BOOL vertexDataInitialized;
 }
 
 @property UIImage *originalImage;

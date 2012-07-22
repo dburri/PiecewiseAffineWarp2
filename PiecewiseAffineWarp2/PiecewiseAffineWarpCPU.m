@@ -19,7 +19,7 @@
 - (UIImage*)warpImage:(UIImage *)image :(PDMShape*)s1 :(PDMShape*)s2 :(NSArray*)tri
 {
     
-    NSLog(@"Perform PAW on CPU");
+    //NSLog(@"Perform PAW on CPU");
     
 //    if(image.imageOrientation != UIImageOrientationUp) {
 //        NSLog(@"PAW on the CPU supports only uppright images...");
@@ -67,37 +67,8 @@
     unsigned char *rawData1 = (unsigned char*) calloc(height * width * 4, sizeof(unsigned char));
     CGImageRef imageRef1 = [image CGImage];
     CGContextRef context = CGBitmapContextCreate(rawData1, width, height, bitsPerComponent, bytesPerRow, colorSpace, kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
-    
-
-    
-//    if (image.imageOrientation == UIImageOrientationUp || image.imageOrientation == UIImageOrientationDown) {
-//        NSLog(@"IMAGE ORIENTATION IS UP");
-//        context = CGBitmapContextCreate(rawData1, width, height, bitsPerComponent, bytesPerRow, colorSpace, bitmapInfo);
-//    } else {
-//        NSLog(@"IMAGE ORIENTATION IS SIDEWAYS");
-//        width = image.size.height;
-//        height = image.size.width;
-//        context = CGBitmapContextCreate(rawData1, height, width, bitsPerComponent, bytesPerRow, colorSpace, bitmapInfo);
-//    }       
-//    
-//    if (image.imageOrientation == UIImageOrientationLeft) {
-//        CGContextRotateCTM(context, M_PI_2);
-//        CGContextTranslateCTM(context, 0, -height);
-//        
-//    } else if (image.imageOrientation == UIImageOrientationRight) {
-//        CGContextRotateCTM(context, -M_PI_2);
-//        CGContextTranslateCTM(context, -width, 0);
-//        
-//    } else if (image.imageOrientation == UIImageOrientationUp) {
-//        // NOTHING
-//    } else if (image.imageOrientation == UIImageOrientationDown) {
-//        CGContextTranslateCTM(context, width, height);
-//        CGContextRotateCTM(context, -M_PI);
-//    }
-
     CGContextDrawImage(context, CGRectMake(0, 0, width, height), imageRef1);
-    //CGImageRef imageRef2 = CGBitmapContextCreateImage(context);
-    CGColorSpaceRelease(colorSpace);
+    
     CGContextRelease(context);
 
     
@@ -105,11 +76,11 @@
     unsigned char *rawData2 = (unsigned char*) calloc(height * width * 4, sizeof(unsigned char));
 
 
-    for(int i = 0; i < [trianglePixels count]; ++i)
+    // perform warping for every triangle
+    int i = 0;
+    for (NSMutableArray *triangle in trianglePixels)
     {
         PDMTMat *T = [transformations objectAtIndex:i];
-        
-        NSMutableArray *triangle = [trianglePixels objectAtIndex:i];
         for(int j = 0; j < [triangle count]; ++j)
         {
             int index = [[triangle objectAtIndex:j] intValue];
@@ -132,28 +103,23 @@
             rawData2[byteIndex2 + 2] = rawData1[byteIndex1 + 2];
             rawData2[byteIndex2 + 3] = rawData1[byteIndex1 + 3];
         }
+        ++i;
     }
     
-    // create UIImage with data 
-    CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, rawData2, width * height * 4, NULL);
-    CGImageRef imageRef3= CGImageCreate(width, height, bitsPerComponent, bytesPerPixel*8, bytesPerRow, colorSpace, bitmapInfo, provider, NULL, false, kCGRenderingIntentDefault);
+    // create UIImage with data
+    CGContextRef contextRef2 = CGBitmapContextCreate(rawData2, width, height, 8, 4*width, colorSpace, bitmapInfo);
+    CGImageRef imageRef2 = CGBitmapContextCreateImage(contextRef2);
+    UIImage *warpedImg = [UIImage imageWithCGImage:imageRef2 scale:1.0 orientation:image.imageOrientation];
     
-//    if (image.imageOrientation == UIImageOrientationUp || image.imageOrientation == UIImageOrientationDown) {
-//        NSLog(@"IMAGE ORIENTATION IS UP");
-//        
-//        imageRef3 = CGImageCreate(width, height, bitsPerComponent, bytesPerPixel*8, bytesPerRow, colorSpace, bitmapInfo, provider, NULL, false, kCGRenderingIntentDefault);
-//    } else {
-//        NSLog(@"IMAGE ORIENTATION IS SIDEWAYS");
-//        imageRef3 = CGImageCreate(height, width, bitsPerComponent, bytesPerPixel*8, bytesPerRow, colorSpace, bitmapInfo, provider, NULL, false, kCGRenderingIntentDefault);
-//    }   
+    CGImageRelease(imageRef2);
+    CGColorSpaceRelease(colorSpace);
+    CGContextRelease(contextRef2);
     
-    //free(rawData1);
-    //free(rawData2);
+    free(rawData1);
+    free(rawData2);
     
-    CGDataProviderRelease(provider);
-    
-    UIImage *warpedImg = [UIImage imageWithCGImage:imageRef3 scale:1.0 orientation:image.imageOrientation];
-    CGImageRelease(imageRef3);
+    transformations = nil;
+    trianglePixels = nil;
     
     return warpedImg;
 }

@@ -56,6 +56,7 @@ typedef struct {
     
     if (self) {
         initialized = NO;
+        vertexDataInitialized = NO;
         [self initContext];
         //[self initShaders];
         //[self initOpenGLWithSize:CGSizeMake(480, 640)];
@@ -86,9 +87,9 @@ typedef struct {
 
 - (void)deallocOES
 {
-#ifdef DEBUG
+//#ifdef DEBUG
     NSLog(@"Delete all OpenGL stuff!!!");
-#endif
+//#endif
     
     glDeleteTextures(1, &texture);
     glDeleteBuffers(1, &vertexBuffer);
@@ -99,6 +100,8 @@ typedef struct {
     
     glDeleteFramebuffers(1, &framebuffer);
     glDeleteRenderbuffers(1, &colorRenderbuffer);
+    
+    initialized = NO;
 }
 
 
@@ -116,7 +119,7 @@ typedef struct {
         return;
     }
     
-    NSLog(@"Render Image...");
+    //NSLog(@"Render Image...");
     
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, colorRenderbuffer);
@@ -142,6 +145,12 @@ typedef struct {
     if(!initialized) {
         NSLog(@"Can't setup VAO! OpenGL is not initialized!");
         return;
+    }
+    
+    if(vertexDataInitialized) {
+        //NSLog(@"VAO already initialized, needs to delete content now...");
+        glDeleteBuffers(1, &vertexBuffer);
+        glDeleteVertexArraysOES(1, &vao);
     }
     
     //NSLog(@"SETUP VERTEX ARRAY OBJECT");
@@ -174,6 +183,7 @@ typedef struct {
     [self checkOpenGLError:@"SetupVAO"];
     
     numVertices = nv;
+    vertexDataInitialized = YES;
 }
 
 
@@ -241,11 +251,11 @@ typedef struct {
     context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
     if(!context) {
         NSLog(@"Failed to initialize OpenGLES 2.0 context");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     if(![EAGLContext setCurrentContext:context]) {
         NSLog(@"Failed to set current context to OpenGL");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -268,6 +278,8 @@ typedef struct {
         NSLog(@"failed to make complete framebuffer object %x", status);
         exit(1);
     }
+    
+    initialized = YES;
     
 #ifdef DEBUG
     // ---------------------------------
@@ -381,6 +393,7 @@ typedef struct {
 #ifdef DEBUG
     NSLog(@"Setup a new texture with image of size %f x %f...", image.size.width, image.size.height);
 #endif
+    glDeleteTextures(1, &texture);
     
     // make image size a power of 2
     CGSize sizeNPOT = image.size;
