@@ -12,6 +12,11 @@
 @interface PiecewiseAffineWarpCPU()
 - (BOOL)isPointInsideTriangle:(float)x :(float)y :(float)x1 :(float)y1 :(float)x2 :(float)y2 :(float)x3 :(float)y3;
 - (PDMTMat*)getTransformationMatNB:(float*)A:(float*)B;
+
+
+- (NSMutableArray*)findPixelIndices:(float*)A :(CGSize)size;
+- (NSArray*)findLinePoints:(float)x0 :(float)y0 :(float)x1 :(float)y1;
+- (void)findContourPoints:(NSArray*)points :(int*)border :(int)height :(int)offset;
 @end
 
 @implementation PiecewiseAffineWarpCPU
@@ -26,34 +31,10 @@
 //        exit(EXIT_FAILURE);
 //    }
     
-    // determine transformation matrix for every triangle pair
-    // as well as all pixels in the destination triangle
-    NSMutableArray *transformations = [[NSMutableArray alloc] init];
-    NSMutableArray *trianglePixels = [[NSMutableArray alloc] init];
+    // -------------------------------------------------------
+    // create source and destination image and create buffers
     
-    float points1[9];
-    float points2[9];
-    for (int i = 0; i < [tri count]; ++i) {
-        PDMTriangle *triangle = [tri objectAtIndex:i];
-        for (int j = 0; j < 3; ++j) {
-            points1[j*3+0] = s1.shape[triangle.index[j]].pos[0];
-            points1[j*3+1] = s1.shape[triangle.index[j]].pos[1];
-            points1[j*3+2] = 1;
-            
-            points2[j*3+0] = s2.shape[triangle.index[j]].pos[0];
-            points2[j*3+1] = s2.shape[triangle.index[j]].pos[1];
-            points2[j*3+2] = 1;
-        }
-        PDMTMat *Tmat = [self getTransformationMatNB:&points2[0] :&points1[0]];
-        [transformations addObject:Tmat];
-        
-        NSMutableArray *pixels = [self findPixelIndices:&points2[0] :image.size];
-        [trianglePixels addObject:pixels];
-    }
-
-
     // image definitions
-    
     float width = image.size.width;
     float height = image.size.height;
     
@@ -75,15 +56,34 @@
     // destination image
     unsigned char *rawData2 = (unsigned char*) calloc(height * width * 4, sizeof(unsigned char));
 
-
+    
+    // -------------------------------------------------------
     // perform warping for every triangle
-    int i = 0;
-    for (NSMutableArray *triangle in trianglePixels)
+    
+    float points1[9];
+    float points2[9];
+    for (int i = 0; i < [tri count]; ++i)
     {
-        PDMTMat *T = [transformations objectAtIndex:i];
-        for(int j = 0; j < [triangle count]; ++j)
+        
+        // Determine transformation matrix and triangle indices
+        PDMTriangle *triangle = [tri objectAtIndex:i];
+        for (int j = 0; j < 3; ++j) {
+            points1[j*3+0] = s1.shape[triangle.index[j]].pos[0];
+            points1[j*3+1] = s1.shape[triangle.index[j]].pos[1];
+            points1[j*3+2] = 1;
+            
+            points2[j*3+0] = s2.shape[triangle.index[j]].pos[0];
+            points2[j*3+1] = s2.shape[triangle.index[j]].pos[1];
+            points2[j*3+2] = 1;
+        }
+        
+        PDMTMat *T = [self getTransformationMatNB:&points2[0] :&points1[0]];
+        NSMutableArray *pixels = [self findPixelIndices:&points2[0] :image.size];
+        
+        // determine color for every pixel in the triangle
+        for(int j = 0; j < [pixels count]; ++j)
         {
-            int index = [[triangle objectAtIndex:j] intValue];
+            int index = [[pixels objectAtIndex:j] intValue];
             float xto = (index%(int)width);
             float yto = floor(index/width);
             
@@ -103,9 +103,9 @@
             rawData2[byteIndex2 + 2] = rawData1[byteIndex1 + 2];
             rawData2[byteIndex2 + 3] = rawData1[byteIndex1 + 3];
         }
-        ++i;
     }
     
+    // -------------------------------------------------------
     // create UIImage with data
     CGContextRef contextRef2 = CGBitmapContextCreate(rawData2, width, height, 8, 4*width, colorSpace, bitmapInfo);
     CGImageRef imageRef2 = CGBitmapContextCreateImage(contextRef2);
@@ -117,9 +117,6 @@
     
     free(rawData1);
     free(rawData2);
-    
-    transformations = nil;
-    trianglePixels = nil;
     
     return warpedImg;
 }
@@ -153,9 +150,9 @@
 //    NSLog(@"x_min_b = %f, x_max_b = %f, y_min_b = %f, y_max_b = %f", x_min_b, x_max_b, y_min_b, y_max_b);
     
     int difference = (int)y_max_b - (int)y_min_b + 1;
-    int *border = malloc(2*difference*sizeof(int));
+    int *border = (int*)malloc(2*difference*sizeof(int));
     if(border == NULL) {
-        NSLog(@"Error could not allocate memory...");
+        NSLog(@"Hello buddy!! Error could not allocate memory in findPixelIndices PAW CPU");
         exit(EXIT_FAILURE);
     }
     
