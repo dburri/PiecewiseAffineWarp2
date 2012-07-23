@@ -20,9 +20,8 @@ typedef struct {
 // private methods
 @interface PiecewiseAffineWarp()
 
-- (void)setImage:(UIImage *)image :(PDMShape*)s1 :(PDMShape*)s2 :(NSArray*)tri;
-
 - (void)initContext;
+- (void)genTexture;
 - (void)initOES;
 - (void)deallocOES;
 - (void)render;
@@ -39,12 +38,7 @@ typedef struct {
 @end
 
 
-
 @implementation PiecewiseAffineWarp
-
-@synthesize originalImage;
-@synthesize warpedImage;
-
 
 /**
  Initialize object. Overwriten from NSObject
@@ -57,9 +51,8 @@ typedef struct {
     if (self) {
         initialized = NO;
         vertexDataInitialized = NO;
+        textureCreated = NO;
         [self initContext];
-        //[self initShaders];
-        //[self initOpenGLWithSize:CGSizeMake(480, 640)];
     }
     return self;
 }
@@ -74,9 +67,10 @@ typedef struct {
         [self deallocOES];
     }
     
-    imgSize = size;
+    outputSize = size;
     [self initOES];
     [self initShaders];
+    [self genTexture];
     initialized = YES;
     
 #ifdef DEBUG
@@ -102,6 +96,8 @@ typedef struct {
     glDeleteRenderbuffers(1, &colorRenderbuffer);
     
     initialized = NO;
+    vertexDataInitialized = NO;
+    textureCreated = NO;
 }
 
 
@@ -126,7 +122,7 @@ typedef struct {
     
     glClearColor(0., 0., 0., 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
-    glViewport(0, 0, imgSize.width, imgSize.height);
+    glViewport(0, 0, outputSize.width, outputSize.height);
     
     glBindVertexArrayOES(vao);
     
@@ -135,6 +131,9 @@ typedef struct {
     glUniform1i(shaderLocation[TEXTURE], 0);
     
     glDrawArrays(GL_TRIANGLES, 0, numVertices);
+    
+    
+    [self checkOpenGLError:@"In render"];
 }
 
 /**
@@ -199,14 +198,14 @@ typedef struct {
     }
     
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-    unsigned char numValues = 4;
-    uint dataSize = (uint)(imgSize.width*imgSize.height*numValues);
-    unsigned char *imgData = (unsigned char *)malloc(dataSize);
+    GLubyte numValues = 4;
+    uint dataSize = (uint)(outputSize.width*outputSize.height*numValues);
+    GLubyte *imgData = (GLubyte*)malloc(dataSize);
     if(!imgData) {
         NSLog(@"Could not allocate buffer to retrieve pixels...");
         exit(EXIT_FAILURE);
     }
-    glReadPixels(0, 0, imgSize.width, imgSize.height, GL_RGBA, GL_UNSIGNED_BYTE, imgData);
+    glReadPixels(0, 0, outputSize.width, outputSize.height, GL_RGBA, GL_UNSIGNED_BYTE, imgData);
     
     GLenum error = glGetError();
     if(error != 0) {
@@ -217,31 +216,25 @@ typedef struct {
     
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
     CGBitmapInfo bitmapInfo = kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Host;
-    CGContextRef contextRef = CGBitmapContextCreate(imgData, imgSize.width, imgSize.height, 8, numValues*imgSize.width, colorSpace, bitmapInfo);
+    CGContextRef contextRef = CGBitmapContextCreate(imgData, outputSize.width, outputSize.height, 8, numValues*outputSize.width, colorSpace, bitmapInfo);
     
-    bool returnError = false;
     if (!contextRef) {
         NSLog(@"Unable to create CGContextRef...");
-        returnError = true;
+        exit(EXIT_FAILURE);
     }
     
     CGImageRef imageRef = CGBitmapContextCreateImage(contextRef);
     if (!imageRef) {
         NSLog(@"Unable to create CGImageRef.");
-        returnError = true;
+        exit(EXIT_FAILURE);
     }
     
     CGColorSpaceRelease(colorSpace);
     CGContextRelease(contextRef);
     free(imgData);
     
-    if(returnError == true) {
-        CGImageRelease(imageRef);
-        return nil;
-    }
-    
     UIImage *img = [UIImage imageWithCGImage:imageRef];
-    CGImageRelease(imageRef);
+    CFRelease(imageRef);
     
     return img;
 }
@@ -269,7 +262,7 @@ typedef struct {
     
     glGenRenderbuffers(1, &colorRenderbuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, colorRenderbuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8_OES, imgSize.width, imgSize.height);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8_OES, outputSize.width, outputSize.height);
     
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorRenderbuffer);
     
@@ -278,6 +271,8 @@ typedef struct {
         NSLog(@"failed to make complete framebuffer object %x", status);
         exit(1);
     }
+    
+    [self checkOpenGLError:@"In initOES"];
     
     initialized = YES;
     
@@ -325,30 +320,18 @@ typedef struct {
 
 - (UIImage*)warpImage:(UIImage *)image :(PDMShape*)s1 :(PDMShape*)s2 :(NSArray*)tri
 {
-    [self setImage:image :s1 :s2 :tri];
-    return [self readFramebuffer];
-}
-
-/**
- Set a new image to process
- @returns An initialized object
- */
-- (void)setImage:(UIImage *)image :(PDMShape*)s1 :(PDMShape*)s2 :(NSArray*) tri
-{
-    originalImage = image;
-
+#ifdef DEBUG
+    NSLog(@"Warp image of size %f x %f...", image.size.width, image.size.height);
+#endif
+    
     // create vertices from shapes
     assert(s1.num_points == s2.num_points);
     int num_vertices = 3*[tri count];
     vertex_pair_t *vertex_pairs = malloc(num_vertices*sizeof(vertex_pair_t));
     
-    NSMutableString *tmp = [[NSMutableString alloc] init];
-    
     int vpi = 0;
-    for(int i = 0; i < [tri count]; ++i)
+    for(PDMTriangle *triangle in tri)
     {
-        [tmp appendFormat:@"[ "];
-        PDMTriangle *triangle = (PDMTriangle*)[tri objectAtIndex:i];
         for(int j = 0; j < 3; ++j)
         {
             vertex_pairs[vpi].posFrom[0] = s1.shape[triangle.index[j]].pos[0];
@@ -359,12 +342,11 @@ typedef struct {
             
             vpi++;
         }
-        [tmp appendFormat:@" ]\n"];
     }
     
     if( (initialized == NO) || 
-        (imgSize.width != image.size.width) || 
-        (imgSize.height != image.size.height) )
+       (outputSize.width != image.size.width) || 
+       (outputSize.height != image.size.height) )
     {
         [self initOpenGLWithSize:image.size];
     }
@@ -372,9 +354,11 @@ typedef struct {
     [self setupVAO:vertex_pairs :num_vertices];
     [self setupTexture:image];
     [self render];
-    warpedImage = [self readFramebuffer];
     
     free(vertex_pairs);
+    UIImage *warpedImage = [self readFramebuffer];
+    
+    return warpedImage;
 }
 
 
@@ -390,38 +374,38 @@ typedef struct {
         return;
     }
     
-#ifdef DEBUG
-    NSLog(@"Setup a new texture with image of size %f x %f...", image.size.width, image.size.height);
-#endif
-    glDeleteTextures(1, &texture);
-    
     // make image size a power of 2
     CGSize sizeNPOT = image.size;
     CGSize size;
     size.width = [self findNextPowerOfTwo:sizeNPOT.width];
     size.height = [self findNextPowerOfTwo:sizeNPOT.height];
+    CGRect rectPOT = CGRectMake(0, 0, size.width, size.height);
     CGRect rectNPOT = CGRectMake(0, 0, sizeNPOT.width, sizeNPOT.height);
-    UIGraphicsBeginImageContext(size);
-    [image drawInRect:rectNPOT];
-    UIImage *imagePOT = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    CGImageRef imageCG = imagePOT.CGImage;
     
+#ifdef DEBUG
+    NSLog(@"Setup a new texture with image of size %i x %i and extend to %i x %i", (int)image.size.width, (int)image.size.height, (int)size.width, (int)size.height);
+#endif
     
     // put data into format for opengl
-    uchar *data = (uchar *)malloc(size.width*size.height*4);
+    GLubyte *data = (GLubyte*)malloc(size.width*size.height*4);
+    if(data == NULL) {
+        NSLog(@"Could not allocate memory...");
+        exit(EXIT_FAILURE);
+    }
     memset(data, 0, size.width*size.height*4);
+    
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
     CGBitmapInfo bitmapInfo = kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big;
-    CGContextRef imageContext = CGBitmapContextCreate(data, size.width, size.height, 8, size.width*4, colorSpace, bitmapInfo);    
+    CGContextRef imageContext = CGBitmapContextCreate(data, size.width, size.height, 8, size.width*4, colorSpace, bitmapInfo);
     CGColorSpaceRelease( colorSpace );
-    CGContextClearRect(imageContext, CGRectMake( 0, 0, size.width, size.height));
-    CGContextDrawImage(imageContext, CGRectMake(0, 0, size.width, size.height), imageCG);
+    CGContextClearRect(imageContext, rectPOT);
+    
+    CGContextTranslateCTM(imageContext, 0, size.height);
+    CGContextScaleCTM(imageContext, 1, -1);
+    CGImageRef imageRef = image.CGImage;
+    CGContextDrawImage(imageContext, rectNPOT, imageRef);
     
     // generate texture
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.width, size.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     
     CGContextRelease(imageContext);
@@ -433,11 +417,28 @@ typedef struct {
     GLint texSizeLocation = glGetUniformLocation(program, "uTexSize");
     glUniform2f(texSizeLocation, size.width, size.height);
     
+#ifdef DEBUG
+    NSLog(@"Texture successfully set up");
+#endif
+    
     
     GLenum error = glGetError();
     if(error != GL_NO_ERROR) {
         NSLog(@"Error in setting up texture: %d", error);
     }
+}
+
+- (void)genTexture
+{
+    NSLog(@"generate new texture...");
+    
+    glDeleteTextures(1, &texture);
+    
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    
+    textureCreated = YES;
 }
 
 

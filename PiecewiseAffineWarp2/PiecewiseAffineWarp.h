@@ -29,10 +29,6 @@ enum {
 
 @interface PiecewiseAffineWarp : NSObject
 {
-@public
-    UIImage *originalImage;
-    UIImage *warpedImage;
-    
 @private
     EAGLContext *context;
     
@@ -51,13 +47,11 @@ enum {
     GLuint vao;
     int numVertices;
     
-    CGSize imgSize;
+    CGSize outputSize;
     BOOL initialized;
     BOOL vertexDataInitialized;
+    BOOL textureCreated;
 }
-
-@property UIImage *originalImage;
-@property UIImage *warpedImage;
 
 typedef unsigned char uchar;
 

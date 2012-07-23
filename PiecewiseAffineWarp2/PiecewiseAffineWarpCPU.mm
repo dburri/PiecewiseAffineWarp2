@@ -8,15 +8,24 @@
 
 #import "PiecewiseAffineWarpCPU.h"
 
+#include <vector>
+
+using namespace std;
+
 
 @interface PiecewiseAffineWarpCPU()
 - (BOOL)isPointInsideTriangle:(float)x :(float)y :(float)x1 :(float)y1 :(float)x2 :(float)y2 :(float)x3 :(float)y3;
 - (PDMTMat*)getTransformationMatNB:(float*)A:(float*)B;
 
 
-- (NSMutableArray*)findPixelIndices:(float*)A :(CGSize)size;
-- (NSArray*)findLinePoints:(float)x0 :(float)y0 :(float)x1 :(float)y1;
-- (void)findContourPoints:(NSArray*)points :(int*)border :(int)height :(int)offset;
+//- (NSMutableArray*)findPixelIndices:(float*)A :(CGSize)size;
+//- (NSArray*)findLinePoints:(float)x0 :(float)y0 :(float)x1 :(float)y1;
+//- (void)findContourPoints:(NSArray*)points :(int*)border :(int)height :(int)offset;
+
+void findLinePoints(float x0, float y0, float x1, float y1, vector<int> &points);
+void findPixelIndices(const float *A, CGSize size, vector<int> &pixels);
+void findContourPoints(const vector<int> &points, int *border, int height, int offset);
+
 @end
 
 @implementation PiecewiseAffineWarpCPU
@@ -78,12 +87,14 @@
         }
         
         PDMTMat *T = [self getTransformationMatNB:&points2[0] :&points1[0]];
-        NSMutableArray *pixels = [self findPixelIndices:&points2[0] :image.size];
+        
+        vector<int> pixels;
+        findPixelIndices(&points2[0], image.size, pixels);
         
         // determine color for every pixel in the triangle
-        for(int j = 0; j < [pixels count]; ++j)
+        for(int j = 0; j < pixels.size(); ++j)
         {
-            int index = [[pixels objectAtIndex:j] intValue];
+            int index = pixels[j];
             float xto = (index%(int)width);
             float yto = floor(index/width);
             
@@ -126,14 +137,14 @@
  Find the pixel indices for each triangle
  @returns Array of array of points [x1, y1, x2, y2, ...., xn, yn]
  */
-- (NSMutableArray*)findPixelIndices:(float*)A :(CGSize)size
+void findPixelIndices(const float *A, CGSize size, vector<int> &pixels)
 {
-    NSMutableArray *pixels = [[NSMutableArray alloc] init];
+    pixels.clear();
     
-    double x_min = INFINITY;
-    double x_max = -INFINITY;
-    double y_min = INFINITY;
-    double y_max = -INFINITY;
+    float x_min = INFINITY;
+    float x_max = -INFINITY;
+    float y_min = INFINITY;
+    float y_max = -INFINITY;
     
     for(int i = 0; i < 3; ++i) {
         if(x_min > A[i*3+0]) { x_min = A[i*3+0]; }
@@ -141,18 +152,25 @@
         if(y_min > A[i*3+1]) { y_min = A[i*3+1]; }
         if(y_max < A[i*3+1]) { y_max = A[i*3+1]; }
     }
-    double x_min_b = MAX(x_min, 0);
-    double x_max_b = MIN(x_max, size.width-1);
-    double y_min_b = MAX(y_min, 0);
-    double y_max_b = MIN(y_max, size.height-1);
     
-//    NSLog(@"x_min = %f, x_max = %f, y_min = %f, y_max = %f", x_min, x_max, y_min, y_max);
-//    NSLog(@"x_min_b = %f, x_max_b = %f, y_min_b = %f, y_max_b = %f", x_min_b, x_max_b, y_min_b, y_max_b);
+    // check if triangle out of bounds
+    if(x_min > size.width || x_max < 0 || y_min > size.height || y_max < 0)
+        return;
+    
+    float x_min_b = MAX(x_min, 0);
+    float x_max_b = MIN(x_max, size.width-1);
+    float y_min_b = MAX(y_min, 0);
+    float y_max_b = MIN(y_max, size.height-1);
     
     int difference = (int)y_max_b - (int)y_min_b + 1;
     int *border = (int*)malloc(2*difference*sizeof(int));
+    
+//    NSLog(@"x_min = %f, x_max = %f, y_min = %f, y_max = %f", x_min, x_max, y_min, y_max);
+//    NSLog(@"x_min_b = %f, x_max_b = %f, y_min_b = %f, y_max_b = %f", x_min_b, x_max_b, y_min_b, y_max_b);
+//    NSLog(@"difference = %i", difference);
+    
     if(border == NULL) {
-        NSLog(@"Hello buddy!! Error could not allocate memory in findPixelIndices PAW CPU");
+        NSLog(@"MY CHECK! Error could not allocate memory in findPixelIndices PAW CPU");
         exit(EXIT_FAILURE);
     }
     
@@ -161,13 +179,18 @@
         border[i*2+1] = -INFINITY;
     }
     int offset = y_min_b;
-    NSArray *p1 = [self findLinePoints:A[0] :A[1] :A[3] :A[4]];
-    NSArray *p2 = [self findLinePoints:A[0] :A[1] :A[6] :A[7]];
-    NSArray *p3 = [self findLinePoints:A[3] :A[4] :A[6] :A[7]];
     
-    [self findContourPoints:p1 :border :difference :offset];
-    [self findContourPoints:p2 :border :difference :offset];
-    [self findContourPoints:p3 :border :difference :offset];
+    vector<int> p1;
+    vector<int> p2;
+    vector<int> p3;
+    
+    findLinePoints(A[0], A[1], A[3], A[4], p1);
+    findLinePoints(A[0], A[1], A[6], A[7], p1);
+    findLinePoints(A[3], A[4], A[6], A[7], p1);
+    
+    findContourPoints(p1, border, difference, offset);
+    findContourPoints(p2, border, difference, offset);
+    findContourPoints(p3, border, difference, offset);
     
     for(int i = 0; i < difference; ++i)
     {
@@ -178,15 +201,13 @@
         
         int index = (offset + i) * size.width + begin;
         for(int i = begin; i <= end; ++i) {
-            [pixels addObject:[NSNumber numberWithInt:index]];
+            pixels.push_back(index);
             index++;
         }
     }
     
     
     free(border);
-    
-    return pixels;
 }
 
 
@@ -194,10 +215,9 @@
  Determine the pixels which form a line between two points using Bresenham's line algorithm.
  @returns Array of points [x1, y1, x2, y2, ...., xn, yn]
  */
-- (NSArray*)findLinePoints:(float)x0 :(float)y0 :(float)x1 :(float)y1
+void findLinePoints(float x0, float y0, float x1, float y1, vector<int> &points)
 {
-    NSMutableArray *points = [[NSMutableArray alloc] init];
-    BOOL steep = (abs(y1 - y0) > abs(x1 - x0));
+    BOOL steep = (fabs(y1 - y0) > fabs(x1 - x0));
     
     float tmp;
     if (steep) {
@@ -224,7 +244,7 @@
     }
     
     float deltax = x1 - x0;
-    float deltay = abs(y1 - y0);
+    float deltay = fabs(y1 - y0);
     float error = 0;
     float deltaerr = deltay / deltax;
     float ystep;
@@ -250,8 +270,8 @@
             yy = (int)y;
         }
         
-        [points addObject:[NSNumber numberWithInt:xx]];
-        [points addObject:[NSNumber numberWithInt:yy]];
+        points.push_back(xx);
+        points.push_back(yy);
         
         error = error + deltaerr;
         if(error >= 0.5) {
@@ -259,8 +279,6 @@
             error -= 1.0;
         }
     }
-    
-    return points;
 }
 
 
@@ -271,16 +289,16 @@
  @param height The height of the contour (= size of the c-array)
  @param offset Offset where the contour starts in the y-axis
  */
-- (void)findContourPoints:(NSArray*)points :(int*)border :(int)height :(int)offset
+void findContourPoints(const vector<int> &points, int *border, int height, int offset)
 {
     int xx = 0;
     int yy = 0;
-    for(int i = 0; i < [points count]; i += 2)
+    for(int i = 0; i < points.size(); i += 2)
     {
-        xx = [[points objectAtIndex:i] intValue];
-        yy = [[points objectAtIndex:i+1] intValue];
+        xx = points[i];
+        yy = points[i+1];
         yy -= offset;
-        //NSLog(@"%i : xx = %i, yy = %i", i, xx, yy);
+        
         if(yy >= 0 && yy < height)
         {
             if(border[yy*2] > xx) {
@@ -414,8 +432,6 @@
     float vcy = yc-ya;
     float vx = x-xa;
     float vy = y-ya;
-
-
 
     float dot00 = vbx*vbx + vby*vby;
     float dot01 = vbx*vcx + vby*vcy;
