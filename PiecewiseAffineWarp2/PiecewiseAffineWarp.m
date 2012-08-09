@@ -395,13 +395,12 @@ typedef struct {
     memset(data, 0, size.width*size.height*4);
     
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-    CGBitmapInfo bitmapInfo = kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big;
+    CGBitmapInfo bitmapInfo = kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Host;
     CGContextRef imageContext = CGBitmapContextCreate(data, size.width, size.height, 8, size.width*4, colorSpace, bitmapInfo);
     CGColorSpaceRelease( colorSpace );
     CGContextClearRect(imageContext, rectPOT);
     
-    CGContextTranslateCTM(imageContext, 0, size.height);
-    CGContextScaleCTM(imageContext, 1, -1);
+    CGContextTranslateCTM(imageContext, 0, rectPOT.size.height-rectNPOT.size.height);
     CGImageRef imageRef = image.CGImage;
     CGContextDrawImage(imageContext, rectNPOT, imageRef);
     
